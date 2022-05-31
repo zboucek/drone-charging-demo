@@ -13,7 +13,7 @@ from cflib.utils import uri_helper
 
 # Parameters
 URIS = []
-URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E701'))
+# URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E701'))
 URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E702'))
 URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E703'))
 # URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E704'))
@@ -161,9 +161,17 @@ def on_position(com, log, goal, yaw):
     d = distance(log.current_position, goal)
     eps = 0.1
     while d > eps:
-        com.send_position_setpoint(goal[0], goal[1], goal[2], yaw)
+        com.send_position_setpoint(goal[0,0], goal[0,1], goal[0,2], yaw)
         time.sleep(0.01)
         d = distance(log.current_position, goal)
+
+def land(com, log):
+    d = distance(log.current_position, log.initial_position)
+    eps = 0.05
+    while d > eps:
+        com.send_velocity_world_setpoint(0, 0, -0.05, 0.0) # landing 0.05 m/s
+        time.sleep(0.01)
+        d = log.current_position[0,2] - log.initial_position[0,2]
         
 def is_sky_clear(loggers):
     """Check if any Crazyflie is flying."""
@@ -176,7 +184,7 @@ def is_sky_clear(loggers):
 def charged_drone(loggers):
     """Check if any Crazyflie is flying."""
     for i, log in enumerate(loggers):
-        if log.pmstate == 2 and log.canfly and log.lhstatus == 2:
+        if log.pmstatus == 2 and log.lhstatus == 2:
             return i
     
     return None
@@ -201,8 +209,8 @@ if __name__ == '__main__':
         
     while True:
         idx = charged_drone(logs)
-        log = logs[idx]
         if idx is not None and is_sky_clear(logs):
+            log = logs[idx]
             goal = log.initial_position + [0,0,0.5]
             with SyncCrazyflie(URIS[idx], cf=Crazyflie(rw_cache='./cache')) as scf:
                 succesful_landing = False
@@ -210,56 +218,24 @@ if __name__ == '__main__':
                 time.sleep(1)
                 on_position(com, log, goal, 0)
                 time.sleep(5)
-                com.land()
+                # land
+                print("Landing.")
+                land(com, log)
                 while not succesful_landing:
                     if log.isFlying != 0:
                         time.sleep(1)
                         continue
-                    elif log.pmstate == 1 or log.pmstate == 2:
+                    elif log.pmstatus == 1 or log.pmstatus == 2:
+                        # Stop motors
+                        print("Stopping motors.")
+                        com.send_stop_setpoint()
                         succesful_landing = True
                     else:
                         on_position(com, log, goal, 0)
-                        com.land()
-                
-            
-        
-    
-
-    # with SyncCrazyflie(URIS[0], cf=Crazyflie(rw_cache='./cache')) as scf:
-    #     # set_initial_position(scf, initial_x, initial_y, initial_z, initial_yaw)
-    #     # reset_estimator(scf)
-    #     N = 800
-    #     dyaw = 0.0
-
-    #     current_x = np.zeros(nx)
-    #     current_y = np.zeros(nx)
-    #     current_z = np.zeros(nx)
-
-    #     # We take off when the commander is created
-    #     com = scf.cf.commander
-    #     time.sleep(1)
-
-    #     print("Commander operational, taking off!")
-
-    #     if into_air:
-    #         # Take off to inital air position
-    #         on_position(com, initial_air, 0)
-    #         # To the start of trajectory
-    #         print("In the air.")
-
-    #     print("End of mission.")
-    #     # End of mission, going for landing!
-    #     if into_air:
-    #         # RTH
-    #         print("RTH.")
-    #         on_position(com, initial_air, 0)
-    #         # land
-    #         print("Landing.")
-    #         com.send_velocity_world_setpoint(0, 0, -0.05, dyaw) # landing 0.05 m/s
-    #         time.sleep(5)
-    #         # Stop motors
-    #         print("Stopping motors.")
-    #         com.send_stop_setpoint()
+                        land(com, log)
+        else:
+            print("Waiting for charged drone.")
+            time.sleep(5)
 
     #     print("Closing connection.")
     #     le._cf.close_link()
