@@ -13,10 +13,11 @@ from cflib.utils import uri_helper
 
 # Parameters
 HEIGHT = 0.5 # z-global [meters]
+VEL_Z = -0.5 # landing velocity [m/s]
 URIS = []
 # URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E701'))
-# URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E702'))
-URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E703'))
+URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E702'))
+# URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E703'))
 # URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E704'))
 
 class Logging:
@@ -38,9 +39,6 @@ class Logging:
         self._cf.connection_failed.add_callback(self._connection_failed)
         self._cf.connection_lost.add_callback(self._connection_lost)
         
-        self.x = 0
-        self.y = 0
-        self.z = 0
         self.dt = 0.5
         self.canfly = 0
         self.isflying = 0
@@ -49,8 +47,12 @@ class Logging:
         self.pmstatus = 0
         self.initial_position = np.empty((1,3))
         self.initial_position[:] = np.nan
-        self.current_position = np.empty((1,3))
-        self.current_position[:] = np.nan
+        
+        self.var_y_history = [1000] * 10
+        self.var_x_history = [1000] * 10
+        self.var_z_history = [1000] * 10
+
+        self.threshold = 0.001
 
         print('Connecting to %s' % link_uri)
         
@@ -74,9 +76,10 @@ class Logging:
         self._lg_stab.add_variable('sys.isFlying', 'uint8_t')
         self._lg_stab.add_variable('sys.canfly', 'uint8_t')
         self._lg_stab.add_variable('sys.isTumbled', 'uint8_t')
-        self._lg_stab.add_variable('stateEstimate.x', 'float')
-        self._lg_stab.add_variable('stateEstimate.y', 'float')
-        self._lg_stab.add_variable('stateEstimate.z', 'float')
+        self._lg_stab.add_variable('kalman.varPX', 'float')
+        self._lg_stab.add_variable('kalman.varPY', 'float')
+        self._lg_stab.add_variable('kalman.varPZ', 'float')
+
         # # The fetch-as argument can be set to FP16 to save space in the log packet
         # self._lg_stab.add_variable('pm.vbat', 'FP16')
 
@@ -109,23 +112,22 @@ class Logging:
         """Callback from a the log API when data arrives"""
 
         # Get position and velocity
-        self.x = data['stateEstimate.x']
-        self.y = data['stateEstimate.y']
-        self.z = data['stateEstimate.z']
         self.lhstatus = data['lighthouse.status']
         self.pmstatus = data['pm.state']
         self.isflying = data['sys.isFlying']
         self.canfly = data['sys.canfly']
         self.crashed = data['sys.isTumbled']
-        self.current_position[0,0] = self.x
-        self.current_position[0,1] = self.y
-        self.current_position[0,2] = self.z
+        self.var_x_history.append(data['kalman.varPX'])
+        self.var_x_history.pop(0)
+        self.var_y_history.append(data['kalman.varPY'])
+        self.var_y_history.pop(0)
+        self.var_z_history.append(data['kalman.varPZ'])
+        self.var_z_history.pop(0)
         
-        
-        if (self.pmstatus  == 1 or self.pmstatus == 2) and self.lhstatus == 2:
-            self.initial_position[0,0] = self.x
-            self.initial_position[0,1] = self.y
-            self.initial_position[0,2] = self.z
+        # if (self.pmstatus  == 1 or self.pmstatus == 2) and self.lhstatus == 2:
+        #     self.initial_position[0,0] = self.x
+        #     self.initial_position[0,1] = self.y
+        #     self.initial_position[0,2] = self.z
 
     def _connection_failed(self, link_uri, msg):
         """Callback when connection initial connection fails (i.e no Crazyflie
@@ -159,66 +161,43 @@ class Logging:
             com.send_position_setpoint(goal[0,0], goal[0,1], goal[0,2], yaw)
             time.sleep(0.01)
             d = distance(self.current_position, goal)
-            
-def wait_for_position_estimator(scf):
-    print('Waiting for estimator to find position...')
 
-    log_config = LogConfig(name='Kalman Variance', period_in_ms=500)
-    log_config.add_variable('kalman.varPX', 'float')
-    log_config.add_variable('kalman.varPY', 'float')
-    log_config.add_variable('kalman.varPZ', 'float')
+    def reset_estimator(self, scf):
+        cf = scf.cf
+        cf.param.set_value('kalman.resetEstimation', '1')
+        time.sleep(0.1)
+        cf.param.set_value('kalman.resetEstimation', '0')
 
-    var_y_history = [1000] * 10
-    var_x_history = [1000] * 10
-    var_z_history = [1000] * 10
+        self.wait_for_position_estimator(cf)
 
-    threshold = 0.001
-
-    with SyncLogger(scf, log_config) as logger:
-        for log_entry in logger:
-            data = log_entry[1]
-
-            var_x_history.append(data['kalman.varPX'])
-            var_x_history.pop(0)
-            var_y_history.append(data['kalman.varPY'])
-            var_y_history.pop(0)
-            var_z_history.append(data['kalman.varPZ'])
-            var_z_history.pop(0)
-
-            min_x = min(var_x_history)
-            max_x = max(var_x_history)
-            min_y = min(var_y_history)
-            max_y = max(var_y_history)
-            min_z = min(var_z_history)
-            max_z = max(var_z_history)
+    def wait_for_position_estimator(self, scf):
+        
+        while True:
+            min_x = min(self.var_x_history)
+            max_x = max(self.var_x_history)
+            min_y = min(self.var_y_history)
+            max_y = max(self.var_y_history)
+            min_z = min(self.var_z_history)
+            max_z = max(self.var_z_history)
 
             # print("{} {} {}".
             #       format(max_x - min_x, max_y - min_y, max_z - min_z))
 
-            if (max_x - min_x) < threshold and (
-                    max_y - min_y) < threshold and (
-                    max_z - min_z) < threshold:
+            if (max_x - min_x) < self.threshold and (
+                    max_y - min_y) < self.threshold and (
+                    max_z - min_z) < self.threshold:
                 break
+    
 
-
-def set_initial_position(scf, x, y, z, yaw_deg):
-    scf.cf.param.set_value('kalman.initialX', x)
-    scf.cf.param.set_value('kalman.initialY', y)
-    scf.cf.param.set_value('kalman.initialZ', z)
-
-    yaw_radians = math.radians(yaw_deg)
-    scf.cf.param.set_value('kalman.initialYaw', yaw_radians)
-
-
-def reset_estimator(scf):
-    cf = scf.cf
-    cf.param.set_value('kalman.resetEstimation', '1')
-    time.sleep(0.1)
-    cf.param.set_value('kalman.resetEstimation', '0')
-
-    wait_for_position_estimator(cf)
-
-
+    def set_initial_position(self, scf, x, y, z, yaw_deg):
+        scf.cf.param.set_value('kalman.initialX', x)
+        scf.cf.param.set_value('kalman.initialY', y)
+        scf.cf.param.set_value('kalman.initialZ', z)
+        
+        yaw_radians = math.radians(yaw_deg)
+        scf.cf.param.set_value('kalman.initialYaw', yaw_radians)
+        self.initial_position = np.array([[x, y, z, yaw_radians]])
+            
 def distance(current, goal):
     """Return distance to goal"""
     return np.linalg.norm(current-goal, ord=2)
@@ -235,7 +214,7 @@ def is_sky_clear(loggers):
 def charged_drone(loggers):
     """Check if any Crazyflie is flying."""
     for i, log in enumerate(loggers):
-        if (log.pmstatus == 2 or log.pmstatus == 1) and log.canfly != 0 and log.lhstatus == 2:
+        if (log.pmstatus == 2 or log.pmstatus == 1) and log.lhstatus == 2:
             return i
     
     return None
@@ -267,19 +246,23 @@ if __name__ == '__main__':
         idx = charged_drone(logs)
         if idx is not None and is_sky_clear(logs):
             log = logs[idx]
-            goal = log.initial_position + [0,0,0.5]
+            print(f"Drone #{idx} is preparing for flight.")
             with SyncCrazyflie(URIS[idx], cf=Crazyflie(rw_cache='./cache')) as scf:
-                set_initial_position(scf, initial_x, initial_y, initial_z, initial_yaw)
-                reset_estimator(scf)
+                log.set_initial_position(scf, initial_x, initial_y, initial_z, initial_yaw)
+                log.reset_estimator(scf)
+                print(f"Estimator has been reset.")
                 goal = np.array([[initial_x, initial_y, initial_z + HEIGHT, initial_yaw]])
                 succesful_landing = False
                 com = scf.cf.commander
                 time.sleep(1)
-                log.on_position(com, goal, 0)
+                com.send_position_setpoint(goal[0,0], goal[0,1], goal[0,2], goal[0,3])
+                time.sleep(5)
+                print(f"Goal achieved.")
                 time.sleep(5)
                 # land
                 print("Landing.")
-                log.land(com)
+                com.send_velocity_world_setpoint(0, 0, VEL_Z, 0.0)
+                time.sleep(5)
                 while not succesful_landing:
                     if log.isflying != 0:
                         time.sleep(1)
@@ -290,8 +273,10 @@ if __name__ == '__main__':
                         com.send_stop_setpoint()
                         succesful_landing = True
                     else:
-                        log.on_position(com, goal, 0)
-                        log.land(com)
+                        com.send_position_setpoint(goal[0,0], goal[0,1], goal[0,2], goal[0,3])
+                        time.sleep(5)
+                        com.send_velocity_world_setpoint(0, 0, VEL_Z, 0.0)
+                        time.sleep(5)
         else:
             print("Waiting for charged drone.")
             time.sleep(5)
