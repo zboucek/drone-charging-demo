@@ -13,10 +13,10 @@ from cflib.utils import uri_helper
 
 # Parameters
 URIS = []
-# URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E701'))
+URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E701'))
 URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E702'))
 URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E703'))
-URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E704'))
+# URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E704'))
 
 class Logging:
     """
@@ -46,6 +46,10 @@ class Logging:
         self.crashed = 0
         self.lhstatus = 0
         self.pmstatus = 0
+        self.initial_position = np.empty((1,3))
+        self.initial_position[:] = np.nan
+        self.current_position = np.empty((1,3))
+        self.current_position[:] = np.nan
 
         print('Connecting to %s' % link_uri)
         
@@ -112,11 +116,15 @@ class Logging:
         self.isflying = data['sys.isFlying']
         self.canfly = data['sys.canfly']
         self.crashed = data['sys.isTumbled']
-
-        print(f'[{timestamp}][{logconf.name}]: ', end='')
-        for name, value in data.items():
-            print(f'{name}: {value:3.3f} ', end='')
-        print()
+        self.current_position[0,0] = self.x
+        self.current_position[0,1] = self.y
+        self.current_position[0,2] = self.z
+        
+        
+        if (self.pmstatus  == 1 or self.pmstatus == 2) and self.lhstatus == 2:
+            self.initial_position[0,0] = self.x
+            self.initial_position[0,1] = self.y
+            self.initial_position[0,2] = self.z
 
     def _connection_failed(self, link_uri, msg):
         """Callback when connection initial connection fails (i.e no Crazyflie
@@ -143,58 +151,79 @@ def set_initial_position(scf, x, y, z, yaw_deg):
     scf.cf.param.set_value('kalman.initialYaw', yaw_radians)
 
 
-def preflight():
-    # Set these to the position and yaw based on how your Crazyflie is placed
-    # on the floor
-    initial_x = 0.0
-    initial_y = 0.0
-    initial_z = 0.0
-    initial_yaw = 0  # In degrees
-    # 0: positive X direction
-    # 90: positive Y direction
-    # 180: negative X direction
-    # 270: negative Y direction
-
-    time.sleep(1)
-
-    initial_x = np.mean(x_history[:50])
-    initial_y = np.mean(y_history[:50])
-    initial_z = np.mean(z_history[:50])
-
-    return initial_x, initial_y, initial_z, initial_yaw
-
-
 def distance(current, goal):
     """Return distance to goal"""
     return np.linalg.norm(current-goal, ord=2)
     #return np.sqrt(np.sum((current-goal)**2))
 
 
-def on_position(com, goal, yaw):
-    d = distance(current_position, goal)
+def on_position(com, log, goal, yaw):
+    d = distance(log.current_position, goal)
     eps = 0.1
     while d > eps:
         com.send_position_setpoint(goal[0], goal[1], goal[2], yaw)
         time.sleep(0.01)
-        d = distance(current_position, goal)
+        d = distance(log.current_position, goal)
+        
+def is_sky_clear(loggers):
+    """Check if any Crazyflie is flying."""
+    for log in loggers:
+        if log.isflying != 0:
+            return False
+    
+    return True
+
+def charged_drone(loggers):
+    """Check if any Crazyflie is flying."""
+    for i, log in enumerate(loggers):
+        if log.pmstate == 2 and log.canfly and log.lhstatus == 2:
+            return i
+    
+    return None
 
 if __name__ == '__main__':
     
-    into_air = True    # True if you want to fly the drone
+    clear_sky = True    # True if you want to fly the drone
 
     # Initialize the low-level drivers
     cflib.crtp.init_drivers()
 
-    le = Logging(URIS[0])
+    # le = Logging(URIS[0])
+    # le2 = Logging(URIS[1])
     
-    while True:
+    logs = []
+    for uri in URIS:
+        logs.append(Logging(uri))
+    
+    while not is_sky_clear:
         # print('running')
         time.sleep(0.5)
-
-    # set initial points
-    initial_x, initial_y, initial_z, initial_yaw = preflight()
-    initial = np.array([initial_x, initial_y, initial_z])
-    initial_air = np.array([initial_x, initial_y, initial_z+0.5])
+        
+    while True:
+        idx = charged_drone(logs)
+        log = logs[idx]
+        if idx is not None and is_sky_clear(logs):
+            goal = log.initial_position + [0,0,0.5]
+            with SyncCrazyflie(URIS[idx], cf=Crazyflie(rw_cache='./cache')) as scf:
+                succesful_landing = False
+                com = scf.cf.commander
+                time.sleep(1)
+                on_position(com, log, goal, 0)
+                time.sleep(5)
+                com.land()
+                while not succesful_landing:
+                    if log.isFlying != 0:
+                        time.sleep(1)
+                        continue
+                    elif log.pmstate == 1 or log.pmstate == 2:
+                        succesful_landing = True
+                    else:
+                        on_position(com, log, goal, 0)
+                        com.land()
+                
+            
+        
+    
 
     # with SyncCrazyflie(URIS[0], cf=Crazyflie(rw_cache='./cache')) as scf:
     #     # set_initial_position(scf, initial_x, initial_y, initial_z, initial_yaw)
