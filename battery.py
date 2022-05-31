@@ -142,6 +142,64 @@ class Logging:
         """Callback when the Crazyflie is disconnected (called in all cases)"""
         print('Disconnected from %s' % link_uri)
         self.is_connected = False
+        
+    
+    def land(self, com, vel_z = -0.05):
+        d = self.current_position[0,2] - self.initial_position[0,2]
+        eps = 0.1
+        while d > eps:
+            com.send_velocity_world_setpoint(0, 0, vel_z, 0.0) # landing vel_z m/s
+            # time.sleep(0.01)
+            d = self.current_position[0,2] - self.initial_position[0,2]
+            
+    def on_position(self, com, goal, yaw = 0.0):
+        d = distance(self.current_position, goal)
+        eps = 0.5
+        while d > eps:
+            com.send_position_setpoint(goal[0,0], goal[0,1], goal[0,2], yaw)
+            time.sleep(0.01)
+            d = distance(self.current_position, goal)
+            
+def wait_for_position_estimator(scf):
+    print('Waiting for estimator to find position...')
+
+    log_config = LogConfig(name='Kalman Variance', period_in_ms=500)
+    log_config.add_variable('kalman.varPX', 'float')
+    log_config.add_variable('kalman.varPY', 'float')
+    log_config.add_variable('kalman.varPZ', 'float')
+
+    var_y_history = [1000] * 10
+    var_x_history = [1000] * 10
+    var_z_history = [1000] * 10
+
+    threshold = 0.001
+
+    with SyncLogger(scf, log_config) as logger:
+        for log_entry in logger:
+            data = log_entry[1]
+
+            var_x_history.append(data['kalman.varPX'])
+            var_x_history.pop(0)
+            var_y_history.append(data['kalman.varPY'])
+            var_y_history.pop(0)
+            var_z_history.append(data['kalman.varPZ'])
+            var_z_history.pop(0)
+
+            min_x = min(var_x_history)
+            max_x = max(var_x_history)
+            min_y = min(var_y_history)
+            max_y = max(var_y_history)
+            min_z = min(var_z_history)
+            max_z = max(var_z_history)
+
+            # print("{} {} {}".
+            #       format(max_x - min_x, max_y - min_y, max_z - min_z))
+
+            if (max_x - min_x) < threshold and (
+                    max_y - min_y) < threshold and (
+                    max_z - min_z) < threshold:
+                break
+
 
 def set_initial_position(scf, x, y, z, yaw_deg):
     scf.cf.param.set_value('kalman.initialX', x)
@@ -152,28 +210,20 @@ def set_initial_position(scf, x, y, z, yaw_deg):
     scf.cf.param.set_value('kalman.initialYaw', yaw_radians)
 
 
+def reset_estimator(scf):
+    cf = scf.cf
+    cf.param.set_value('kalman.resetEstimation', '1')
+    time.sleep(0.1)
+    cf.param.set_value('kalman.resetEstimation', '0')
+
+    wait_for_position_estimator(cf)
+
+
 def distance(current, goal):
     """Return distance to goal"""
     return np.linalg.norm(current-goal, ord=2)
     #return np.sqrt(np.sum((current-goal)**2))
 
-
-def on_position(com, log, goal, yaw):
-    d = distance(log.current_position, goal)
-    eps = 0.5
-    while d > eps:
-        com.send_position_setpoint(goal[0,0], goal[0,1], goal[0,2], yaw)
-        time.sleep(0.01)
-        d = distance(log.current_position, goal)
-
-def land(com, log):
-    d = log.current_position[0,2] - log.initial_position[0,2]
-    eps = 0.1
-    while d > eps:
-        com.send_velocity_world_setpoint(0, 0, -0.05, 0.0) # landing 0.05 m/s
-        # time.sleep(0.01)
-        d = log.current_position[0,2] - log.initial_position[0,2]
-        
 def is_sky_clear(loggers):
     """Check if any Crazyflie is flying."""
     for log in loggers:
@@ -200,6 +250,11 @@ if __name__ == '__main__':
     # le = Logging(URIS[0])
     # le2 = Logging(URIS[1])
     
+    initial_x = 0.0
+    initial_y = 0.0
+    initial_z = 0.0
+    initial_yaw = 0.0
+    
     logs = []
     for uri in URIS:
         logs.append(Logging(uri))
@@ -214,14 +269,17 @@ if __name__ == '__main__':
             log = logs[idx]
             goal = log.initial_position + [0,0,0.5]
             with SyncCrazyflie(URIS[idx], cf=Crazyflie(rw_cache='./cache')) as scf:
+                set_initial_position(scf, initial_x, initial_y, initial_z, initial_yaw)
+                reset_estimator(scf)
+                goal = np.array([[initial_x, initial_y, initial_z + HEIGHT, initial_yaw]])
                 succesful_landing = False
                 com = scf.cf.commander
                 time.sleep(1)
-                on_position(com, log, goal, 0)
+                log.on_position(com, goal, 0)
                 time.sleep(5)
                 # land
                 print("Landing.")
-                land(com, log)
+                log.land(com)
                 while not succesful_landing:
                     if log.isflying != 0:
                         time.sleep(1)
@@ -232,8 +290,8 @@ if __name__ == '__main__':
                         com.send_stop_setpoint()
                         succesful_landing = True
                     else:
-                        on_position(com, log, goal, 0)
-                        land(com, log)
+                        log.on_position(com, goal, 0)
+                        log.land(com)
         else:
             print("Waiting for charged drone.")
             time.sleep(5)
