@@ -12,9 +12,10 @@ from cflib.crazyflie.commander import Commander
 from cflib.utils import uri_helper
 
 # Parameters
+HEIGHT = 0.5 # z-global [meters]
 URIS = []
 # URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E701'))
-URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E702'))
+# URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E702'))
 URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E703'))
 # URIS.append(uri_helper.uri_from_env(default='radio://0/100/2M/E7E7E7E704'))
 
@@ -40,7 +41,7 @@ class Logging:
         self.x = 0
         self.y = 0
         self.z = 0
-        self.dt = 0.1
+        self.dt = 0.5
         self.canfly = 0
         self.isflying = 0
         self.crashed = 0
@@ -159,18 +160,18 @@ def distance(current, goal):
 
 def on_position(com, log, goal, yaw):
     d = distance(log.current_position, goal)
-    eps = 0.1
+    eps = 0.5
     while d > eps:
         com.send_position_setpoint(goal[0,0], goal[0,1], goal[0,2], yaw)
         time.sleep(0.01)
         d = distance(log.current_position, goal)
 
 def land(com, log):
-    d = distance(log.current_position, log.initial_position)
-    eps = 0.05
+    d = log.current_position[0,2] - log.initial_position[0,2]
+    eps = 0.1
     while d > eps:
         com.send_velocity_world_setpoint(0, 0, -0.05, 0.0) # landing 0.05 m/s
-        time.sleep(0.01)
+        # time.sleep(0.01)
         d = log.current_position[0,2] - log.initial_position[0,2]
         
 def is_sky_clear(loggers):
@@ -184,7 +185,7 @@ def is_sky_clear(loggers):
 def charged_drone(loggers):
     """Check if any Crazyflie is flying."""
     for i, log in enumerate(loggers):
-        if log.pmstatus == 2 and log.lhstatus == 2:
+        if (log.pmstatus == 2 or log.pmstatus == 1) and log.canfly != 0 and log.lhstatus == 2:
             return i
     
     return None
@@ -222,7 +223,7 @@ if __name__ == '__main__':
                 print("Landing.")
                 land(com, log)
                 while not succesful_landing:
-                    if log.isFlying != 0:
+                    if log.isflying != 0:
                         time.sleep(1)
                         continue
                     elif log.pmstatus == 1 or log.pmstatus == 2:
