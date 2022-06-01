@@ -12,7 +12,7 @@ class SwarmCharge(Swarm):
         self.t_takeoff = 2.0
         self.t_land = 0.5
         self.t_goto = 5.0
-        self.t_wait = 10.0
+        self.t_wait = 1.0
         
     def __get_charging_status(self, scf):
         log_config = LogConfig(name='state', period_in_ms=10)
@@ -57,8 +57,9 @@ class SwarmCharge(Swarm):
     def __in_air(self):
         if self.cf_in_air:
             return True
+        self.get_charging_status()
         for state in self._states:
-            if state.isflying != 0:
+            if self._states[state].isflying != 0:
                 return True
         
         return False
@@ -73,7 +74,7 @@ class SwarmCharge(Swarm):
         var_x_history = [1000] * 10
         var_z_history = [1000] * 10
 
-        threshold = 0.0001
+        threshold = 0.00001
 
         with SyncLogger(scf, log_config) as logger:
             for log_entry in logger:
@@ -133,19 +134,29 @@ class SwarmCharge(Swarm):
                 commander.land(0.0,self.t_land)
                 print(f"{uri}: Landing...")
                 time.sleep(self.t_land+1)
-                self.get_charging_status()
+                for i in range(5):
+                    self.get_charging_status()
+                    time.sleep(self.t_wait)
+                    if self._states[uri].pmstate == 1:
+                        break
+                    elif self._states[uri].pmstate == 3:
+                        print(f"{uri}: Low battery, abort mission")
+                        break
                 while self._states[uri].pmstate != 1:
                     print(f"{uri}: Landing failed, retry started")
-                    commander.go_to(0.0,0.0,0.3,0.0,self.t_goto)
+                    commander.go_to(0.0,0.0,0.1,0.0,self.t_goto)
                     time.sleep(self.t_goto+1)
-                    commander.go_to(0.0,0.0,0.02,0.0,self.t_goto)
+                    commander.go_to(0.0,0.0,0.03,0.0,self.t_goto)
                     time.sleep(self.t_goto)
                     commander.land(0.0,self.t_land)
                     time.sleep(self.t_wait)
-                    for i in range(10):
+                    for i in range(5):
                         self.get_charging_status()
                         time.sleep(self.t_wait)
-                        if self._states[uri].pmstate != 1:
+                        if self._states[uri].pmstate == 1:
+                            break
+                        elif self._states[uri].pmstate == 3:
+                            print(f"{uri}: Low battery, abort mission")
                             break
                 
                 print(f"{uri}: Landing successful")
