@@ -139,10 +139,11 @@ if __name__ == '__main__':
             # print("running sequence")
             # swarm.sequential(run_sequence)
             status = swarm.get_charging_status()
-            if status[URI1].canfly !=0:
-                print(f"{URI1} can fly")
+            for uri in uris:
+                if status[uri].canfly !=0:
+                    print(f"{uri} can fly.")
             else:
-                print(f"{URI1} can fly")
+                    print(f"{uri} cannot fly.")
             charged_uri, charged_drone = swarm.get_charged_drone()
-            print(charged_uri)
+            print(f"{charged_uri} is charged.")
             time.sleep(5)

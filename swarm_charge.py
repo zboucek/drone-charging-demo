@@ -27,12 +27,12 @@ class SwarmCharge(Swarm):
                 self._states[scf.cf.link_uri] = SwarmState(pmstate, lhstatus, isflying, canfly, crashed)
                 break
     
-    def __get_charged_drone(self):
+    def get_charged_drone(self):
         """Sequentially search for charged and flyable drone."""
         
         states = self.get_charging_status()
         for uri, cf in self._cfs.items():
-            if self._states[uri].pmstate == 2 and self._states[uri].lhstatus == 2 and self._states[uri].canfly !=0:
+            if self._states[uri].pmstate == 2 and self._states[uri].lhstatus == 2:# and self._states[uri].canfly !=0:
                 return uri, cf
         
         return None, None
