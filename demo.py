@@ -60,89 +60,11 @@ uris = {
     # URI4
 }
 
-CF_IN_AIR = False # safety variable (only one drone at a time)
-    
-def set_initial_position(self, scf, x, y, z, yaw_radians = 0.0):
-    scf.cf.param.set_value('kalman.initialX', x)
-    scf.cf.param.set_value('kalman.initialY', y)
-    scf.cf.param.set_value('kalman.initialZ', z)
-    scf.cf.param.set_value('kalman.initialYaw', yaw_radians)
-
-
-def take_off(cf, position):
-    take_off_time = 1.0
-    sleep_time = 0.1
-    steps = int(take_off_time / sleep_time)
-    vz = position[2] / take_off_time
-
-    print(vz)
-
-    for i in range(steps):
-        cf.commander.send_velocity_world_setpoint(0, 0, vz, 0)
-        time.sleep(sleep_time)
-    
-    cf.commander.send_position_setpoint(0, 0, HEIGHT, 0)
-
-
-def land(cf, position):
-    landing_time = 1.0
-    sleep_time = 0.1
-    steps = int(landing_time / sleep_time)
-    vz = -position[2] / landing_time
-
-    print(vz)
-
-    for _ in range(steps):
-        cf.commander.send_velocity_world_setpoint(0, 0, vz, 0)
-        time.sleep(sleep_time)
-
-    cf.commander.send_stop_setpoint()
-    # Make sure that the last packet leaves before the link is closed
-    # since the message queue is not flushed before closing
-    time.sleep(0.1)
-
-
-def run_sequence(scf):
-    try:
-        cf = scf.cf
-        # print(cf)
-        # print('fly')
-        if CF_IN_AIR:
-            CF_IN_AIR = False
-        else:
-            CF_IN_AIR = False
-
-        print(CF_IN_AIR)
-        # take_off(cf, sequence[0])
-        # for position in sequence:
-        #     print('Setting position {}'.format(position))
-        #     end_time = time.time() + position[3]
-        #     while time.time() < end_time:
-        #         cf.commander.send_position_setpoint(position[0],
-        #                                             position[1],
-        #                                             position[2], 0)
-        #         time.sleep(0.1)
-        # land(cf, HEIGHT)
-    except Exception as e:
-        print(e)
-
-
 if __name__ == '__main__':
     # logging.basicConfig(level=logging.DEBUG)
     cflib.crtp.init_drivers()
 
     factory = CachedCfFactory(rw_cache='./cache')
     with SwarmCharge(uris, factory=factory) as swarm:
-        # swarm.reset_estimators()
-        # swarm.parallel(reset_estimator)
         # while True:
-            # print("running sequence")
-            # swarm.sequential(run_sequence)
-            status = swarm.get_charging_status()
-            for uri in uris:
-                if status[uri].canfly !=0:
-                    print(f"{uri} can fly.")
-                else:
-                    print(f"{uri} cannot fly.")
-            swarm.demo_mission()
-            # time.sleep(5)
+        swarm.demo_mission()

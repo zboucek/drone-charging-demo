@@ -31,6 +31,11 @@ class SwarmCharge(Swarm):
                 self._states[scf.cf.link_uri] = SwarmState(pmstate, lhstatus, isflying, canfly, crashed)
                 break
     
+    
+    def get_charging_status(self):
+        self.parallel_safe(self.__get_charging_status)
+        return self._states
+    
     def __get_charged_drone(self):
         """Sequentially search for charged and flyable drone."""
         
@@ -100,9 +105,6 @@ class SwarmCharge(Swarm):
         cf.param.set_value('kalman.resetEstimation', '0')
         self.__wait_for_position_estimator(scf)
     
-    def get_charging_status(self):
-        self.parallel_safe(self.__get_charging_status)
-        return self._states
     
     def demo_mission(self):
         if not self.__in_air():
@@ -120,12 +122,30 @@ class SwarmCharge(Swarm):
             try:
                 commander = cf.cf.high_level_commander
                 commander.takeoff(self.height,self.t_takeoff)
+                print(f"{uri}: Take off")
                 time.sleep(self.t_takeoff+1)
-                commander.go_to(0.0,0.0,0.0,0.0,self.t_goto)
+                commander.go_to(0.0,0.0,self.height,0.0,self.t_goto)
+                print(f"{uri}: Go to setpoint")
                 time.sleep(self.t_goto+1)
-                commander.go_to(0.0,0.0,0.0,0.1,self.t_goto)
+                commander.go_to(0.0,0.0,0.1,0.0,self.t_goto)
+                print(f"{uri}: Prepare for landing")
                 time.sleep(self.t_goto+1)
                 commander.land(0.0,self.t_land)
+                print(f"{uri}: Landing...")
+                time.sleep(self.t_land+1)
+                self.get_charging_status()
+                while self._states[uri].pmstate != 2:
+                    print(f"{uri}: Landing failed, retry started")
+                    commander.go_to(0.0,0.0,self.height,0.0,self.t_goto)
+                    time.sleep(self.t_goto+1)
+                    commander.go_to(0.0,0.0,0.1,0.0,self.t_goto)
+                    time.sleep(self.t_goto+0.5)
+                    commander.land(0.0,self.t_land)
+                    time.sleep(self.t_land+1)
+                    self.get_charging_status()
+                
+                print(f"{uri}: Landing successful")
+                commander.stop()
                 self.cf_in_air = False
             except Exception as e:
                 commander.stop()
