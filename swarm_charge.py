@@ -10,8 +10,9 @@ class SwarmCharge(Swarm):
         self.cf_in_air = False
         self._states = dict()
         self.t_takeoff = 2.0
-        self.t_land = 2.0
+        self.t_land = 0.5
         self.t_goto = 5.0
+        self.t_wait = 10.0
         
     def __get_charging_status(self, scf):
         log_config = LogConfig(name='state', period_in_ms=10)
@@ -42,7 +43,7 @@ class SwarmCharge(Swarm):
         self.get_charging_status()
         for uri, cf in self._cfs.items():
                 # return uri, cf
-            if self._states[uri].pmstate == 2 and self._states[uri].lhstatus == 2:# and self._states[uri].canfly !=0:
+            if self._states[uri].pmstate == 2 and self._states[uri].lhstatus == 2:
                 return uri, cf
         
         return None, None
@@ -56,9 +57,8 @@ class SwarmCharge(Swarm):
     def __in_air(self):
         if self.cf_in_air:
             return True
-        for uri, cf in self._cfs.items():
-            if self._states[uri].isflying != 0:
-                print(self._states[uri].isflying)
+        for state in self._states:
+            if state.isflying != 0:
                 return True
         
         return False
@@ -73,7 +73,7 @@ class SwarmCharge(Swarm):
         var_x_history = [1000] * 10
         var_z_history = [1000] * 10
 
-        threshold = 0.001
+        threshold = 0.0001
 
         with SyncLogger(scf, log_config) as logger:
             for log_entry in logger:
@@ -134,15 +134,19 @@ class SwarmCharge(Swarm):
                 print(f"{uri}: Landing...")
                 time.sleep(self.t_land+1)
                 self.get_charging_status()
-                while self._states[uri].pmstate != 2:
+                while self._states[uri].pmstate != 1:
                     print(f"{uri}: Landing failed, retry started")
-                    commander.go_to(0.0,0.0,self.height,0.0,self.t_goto)
+                    commander.go_to(0.0,0.0,0.3,0.0,self.t_goto)
                     time.sleep(self.t_goto+1)
-                    commander.go_to(0.0,0.0,0.1,0.0,self.t_goto)
-                    time.sleep(self.t_goto+0.5)
+                    commander.go_to(0.0,0.0,0.02,0.0,self.t_goto)
+                    time.sleep(self.t_goto)
                     commander.land(0.0,self.t_land)
-                    time.sleep(self.t_land+1)
-                    self.get_charging_status()
+                    time.sleep(self.t_wait)
+                    for i in range(10):
+                        self.get_charging_status()
+                        time.sleep(self.t_wait)
+                        if self._states[uri].pmstate != 1:
+                            break
                 
                 print(f"{uri}: Landing successful")
                 commander.stop()

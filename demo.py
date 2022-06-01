@@ -50,14 +50,14 @@ VEL_Z = -0.5 # landing velocity [m/s]
 # URI1 = 'radio://0/100/2M/E7E7E7E701'
 URI2 = 'radio://0/100/2M/E7E7E7E702'
 URI3 = 'radio://0/100/2M/E7E7E7E703'
-# URI4 = 'radio://0/100/2M/E7E7E7E704'
+URI4 = 'radio://0/100/2M/E7E7E7E704'
 
 # List of URIs, comment the one you do not want to fly
 uris = {
     # URI1,
     URI2,
     URI3,
-    # URI4
+    URI4
 }
 
 if __name__ == '__main__':
