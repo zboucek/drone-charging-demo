@@ -27,34 +27,19 @@ class SwarmCharge(Swarm):
                 self._states[scf.cf.link_uri] = SwarmState(pmstate, lhstatus, isflying, canfly, crashed)
                 break
     
-    def __in_air(self):
-        """
-        Execute a function for all Crazyflies in the swarm, in sequence.
-
-        The first argument of the function that is passed in will be a
-        SyncCrazyflie instance connected to the Crazyflie to operate on.
-        A list of optional parameters (per Crazyflie) may follow defined by
-        the args_dict. The dictionary is keyed on URI.
-
-        Example:
-        def my_function(scf, optional_param0, optional_param1)
-            ...
-
-        args_dict = {
-            URI0: [optional_param0_cf0, optional_param1_cf0],
-            URI1: [optional_param0_cf1, optional_param1_cf1],
-            ...
-        }
-
-
-        self.sequential(my_function, args_dict)
-
-        :param func: the function to execute
-        :param args_dict: parameters to pass to the function
-        """
+    def __get_charged_drone(self):
+        """Sequentially search for charged and flyable drone."""
         
+        states = self.get_charging_status()
         for uri, cf in self._cfs.items():
-            if self._states[uri]['isflying'] != 0:
+            if self._states[uri].pmstate == 2 and self._states[uri].lhstatus == 2 and self._states[uri].canfly !=0:
+                return uri, cf
+        
+        return None, None
+
+    def __in_air(self):
+        for uri, cf in self._cfs.items():
+            if self._states[uri].isflying != 0:
                 return True
         
         return False
