@@ -38,22 +38,24 @@ from cflib.crazyflie.swarm import CachedCfFactory
 from cflib.crazyflie.swarm import Swarm
 from cflib.crazyflie.syncLogger import SyncLogger
 
+CF_IN_AIR = False # safety variable (only one drone at a time)
+
 # Parameters
 HEIGHT = 0.5 # z-global [meters]
 VEL_Z = -0.5 # landing velocity [m/s]
 
 # Change uris and sequences according to your setup
-URI1 = 'radio://0/100/2M/E7E7E7E701'
+# URI1 = 'radio://0/100/2M/E7E7E7E701'
 URI2 = 'radio://0/100/2M/E7E7E7E702'
 URI3 = 'radio://0/100/2M/E7E7E7E703'
-URI4 = 'radio://0/100/2M/E7E7E7E704'
+# URI4 = 'radio://0/100/2M/E7E7E7E704'
 
 # List of URIs, comment the one you do not want to fly
 uris = {
-    URI1,
+    # URI1,
     URI2,
     URI3,
-    URI4
+    # URI4
 }
 
 CF_IN_AIR = False # safety variable (only one drone at a time)
@@ -70,7 +72,7 @@ def wait_for_position_estimator(scf):
     var_x_history = [1000] * 10
     var_z_history = [1000] * 10
 
-    threshold = 0.001
+    threshold = 0.01
 
     with SyncLogger(scf, log_config) as logger:
         for log_entry in logger:
@@ -96,6 +98,7 @@ def wait_for_position_estimator(scf):
             if (max_x - min_x) < threshold and (
                     max_y - min_y) < threshold and (
                     max_z - min_z) < threshold:
+                print("Position found")
                 break
 
 def reset_estimator(scf):
@@ -146,24 +149,29 @@ def land(cf, position):
     time.sleep(0.1)
 
 
-def run_sequence(scf, sequence):
-    if not CF_IN_AIR:
-        CF_IN_AIR = True
-        try:
-            cf = scf.cf
+def run_sequence(scf):
+    try:
+        cf = scf.cf
+        # print(cf)
+        # print('fly')
+        if CF_IN_AIR:
+            CF_IN_AIR = False
+        else:
+            CF_IN_AIR = False
 
-            take_off(cf, sequence[0])
-            # for position in sequence:
-            #     print('Setting position {}'.format(position))
-            #     end_time = time.time() + position[3]
-            #     while time.time() < end_time:
-            #         cf.commander.send_position_setpoint(position[0],
-            #                                             position[1],
-            #                                             position[2], 0)
-            #         time.sleep(0.1)
-            land(cf, HEIGHT)
-        except Exception as e:
-            print(e)
+        print(CF_IN_AIR)
+        # take_off(cf, sequence[0])
+        # for position in sequence:
+        #     print('Setting position {}'.format(position))
+        #     end_time = time.time() + position[3]
+        #     while time.time() < end_time:
+        #         cf.commander.send_position_setpoint(position[0],
+        #                                             position[1],
+        #                                             position[2], 0)
+        #         time.sleep(0.1)
+        # land(cf, HEIGHT)
+    except Exception as e:
+        print(e)
 
 
 if __name__ == '__main__':
@@ -172,6 +180,8 @@ if __name__ == '__main__':
 
     factory = CachedCfFactory(rw_cache='./cache')
     with Swarm(uris, factory=factory) as swarm:
-        swarm.parallel(reset_estimator)
+        swarm.reset_estimators()
+        # swarm.parallel(reset_estimator)
         while True:
+            print("running sequence")
             swarm.parallel(run_sequence)
