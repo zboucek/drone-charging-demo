@@ -117,15 +117,19 @@ class SwarmCharge(Swarm):
             # self.__reset_estimator(cf)
             cf.cf.param.set_value('commander.enHighLevel', '1')
             self.cf_in_air = True
-            commander = cf.cf.high_level_commander
-            commander.takeoff(self.height,self.t_takeoff)
-            time.sleep(self.t_takeoff+1)
-            commander.goto(0,0,1.0,self.t_goto)
-            time.sleep(self.t_goto+1)
-            commander.goto(0,0,0.1,self.t_goto)
-            time.sleep(self.t_goto+1)
-            commander.land(0,self.t_land)
-            self.cf_in_air = False
+            try:
+                commander = cf.cf.high_level_commander
+                commander.takeoff(self.height,self.t_takeoff)
+                time.sleep(self.t_takeoff+1)
+                commander.go_to(0.0,0.0,0.0,0.0,self.t_goto)
+                time.sleep(self.t_goto+1)
+                commander.go_to(0.0,0.0,0.0,0.1,self.t_goto)
+                time.sleep(self.t_goto+1)
+                commander.land(0.0,self.t_land)
+                self.cf_in_air = False
+            except Exception as e:
+                commander.stop()
+                self.close_links()
         else:
             print("Err: drone in the air!")
             return
