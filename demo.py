@@ -135,15 +135,14 @@ if __name__ == '__main__':
     with SwarmCharge(uris, factory=factory) as swarm:
         # swarm.reset_estimators()
         # swarm.parallel(reset_estimator)
-        while True:
+        # while True:
             # print("running sequence")
             # swarm.sequential(run_sequence)
             status = swarm.get_charging_status()
             for uri in uris:
                 if status[uri].canfly !=0:
                     print(f"{uri} can fly.")
-            else:
+                else:
                     print(f"{uri} cannot fly.")
-            charged_uri, charged_drone = swarm.get_charged_drone()
-            print(f"{charged_uri} is charged.")
-            time.sleep(5)
+            swarm.demo_mission()
+            # time.sleep(5)
