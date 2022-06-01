@@ -136,8 +136,13 @@ if __name__ == '__main__':
         # swarm.reset_estimators()
         # swarm.parallel(reset_estimator)
         while True:
-            print("running sequence")
+            # print("running sequence")
             # swarm.sequential(run_sequence)
             status = swarm.get_charging_status()
-            print(status[URI1][3])
+            if status[URI1].canfly !=0:
+                print(f"{URI1} can fly")
+            else:
+                print(f"{URI1} can fly")
+            charged_uri, charged_drone = swarm.get_charged_drone()
+            print(charged_uri)
             time.sleep(5)
