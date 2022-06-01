@@ -30,13 +30,15 @@ generic and each Crazyflie has its own sequence of setpoints that it files
 to.
 
 """
+from calendar import c
 import time
+from collections import namedtuple
 
 import cflib.crtp
-from cflib.crazyflie.log import LogConfig
+# from cflib.crazyflie.log import LogConfig
 from cflib.crazyflie.swarm import CachedCfFactory
-from cflib.crazyflie.swarm import Swarm
-from cflib.crazyflie.syncLogger import SyncLogger
+from swarm_charge import SwarmCharge
+# from cflib.crazyflie.syncLogger import SyncLogger
 
 CF_IN_AIR = False # safety variable (only one drone at a time)
 
@@ -45,69 +47,20 @@ HEIGHT = 0.5 # z-global [meters]
 VEL_Z = -0.5 # landing velocity [m/s]
 
 # Change uris and sequences according to your setup
-# URI1 = 'radio://0/100/2M/E7E7E7E701'
-URI2 = 'radio://0/100/2M/E7E7E7E702'
-URI3 = 'radio://0/100/2M/E7E7E7E703'
+URI1 = 'radio://0/100/2M/E7E7E7E701'
+# URI2 = 'radio://0/100/2M/E7E7E7E702'
+# URI3 = 'radio://0/100/2M/E7E7E7E703'
 # URI4 = 'radio://0/100/2M/E7E7E7E704'
 
 # List of URIs, comment the one you do not want to fly
 uris = {
-    # URI1,
-    URI2,
-    URI3,
+    URI1,
+    # URI2,
+    # URI3,
     # URI4
 }
 
 CF_IN_AIR = False # safety variable (only one drone at a time)
-
-def wait_for_position_estimator(scf):
-    print('Waiting for estimator to find position...')
-
-    log_config = LogConfig(name='Kalman Variance', period_in_ms=500)
-    log_config.add_variable('kalman.varPX', 'float')
-    log_config.add_variable('kalman.varPY', 'float')
-    log_config.add_variable('kalman.varPZ', 'float')
-
-    var_y_history = [1000] * 10
-    var_x_history = [1000] * 10
-    var_z_history = [1000] * 10
-
-    threshold = 0.01
-
-    with SyncLogger(scf, log_config) as logger:
-        for log_entry in logger:
-            data = log_entry[1]
-
-            var_x_history.append(data['kalman.varPX'])
-            var_x_history.pop(0)
-            var_y_history.append(data['kalman.varPY'])
-            var_y_history.pop(0)
-            var_z_history.append(data['kalman.varPZ'])
-            var_z_history.pop(0)
-
-            min_x = min(var_x_history)
-            max_x = max(var_x_history)
-            min_y = min(var_y_history)
-            max_y = max(var_y_history)
-            min_z = min(var_z_history)
-            max_z = max(var_z_history)
-
-            # print("{} {} {}".
-            #       format(max_x - min_x, max_y - min_y, max_z - min_z))
-
-            if (max_x - min_x) < threshold and (
-                    max_y - min_y) < threshold and (
-                    max_z - min_z) < threshold:
-                print("Position found")
-                break
-
-def reset_estimator(scf):
-    cf = scf.cf
-    cf.param.set_value('kalman.resetEstimation', '1')
-    time.sleep(0.1)
-    cf.param.set_value('kalman.resetEstimation', '0')
-
-    wait_for_position_estimator(cf)
     
 def set_initial_position(self, scf, x, y, z, yaw_radians = 0.0):
     scf.cf.param.set_value('kalman.initialX', x)
@@ -179,9 +132,12 @@ if __name__ == '__main__':
     cflib.crtp.init_drivers()
 
     factory = CachedCfFactory(rw_cache='./cache')
-    with Swarm(uris, factory=factory) as swarm:
-        swarm.reset_estimators()
+    with SwarmCharge(uris, factory=factory) as swarm:
+        # swarm.reset_estimators()
         # swarm.parallel(reset_estimator)
         while True:
             print("running sequence")
-            swarm.parallel(run_sequence)
+            # swarm.sequential(run_sequence)
+            status = swarm.get_charging_status()
+            print(status[URI1][3])
+            time.sleep(5)
