@@ -43,7 +43,7 @@ class SwarmCharge(Swarm):
         self.get_charging_status()
         for uri, cf in self._cfs.items():
                 # return uri, cf
-            if self._states[uri].pmstate == 2 and self._states[uri].lhstatus == 2:
+            if (self._states[uri].pmstate == 2 or self._states[uri].pmstate == 2) and self._states[uri].lhstatus == 2:
                 return uri, cf
         
         return None, None
@@ -74,7 +74,7 @@ class SwarmCharge(Swarm):
         var_x_history = [1000] * 10
         var_z_history = [1000] * 10
 
-        threshold = 0.00001
+        threshold = 0.000001
 
         with SyncLogger(scf, log_config) as logger:
             for log_entry in logger:
@@ -128,11 +128,12 @@ class SwarmCharge(Swarm):
                 commander.go_to(0.0,0.0,self.height,0.0,self.t_goto)
                 print(f"{uri}: Go to setpoint")
                 time.sleep(self.t_goto+1)
-                commander.go_to(0.0,0.0,0.1,0.0,self.t_goto)
                 print(f"{uri}: Prepare for landing")
-                time.sleep(self.t_goto+1)
-                commander.land(0.0,self.t_land)
+                commander.go_to(0.0,0.0,0.06,0.0,self.t_goto)
+                time.sleep(self.t_goto+2)
+                commander.land(0.03,self.t_land)
                 print(f"{uri}: Landing...")
+                time.sleep(self.t_goto+2)
                 time.sleep(self.t_land+1)
                 for i in range(5):
                     self.get_charging_status()
@@ -144,11 +145,12 @@ class SwarmCharge(Swarm):
                         break
                 while self._states[uri].pmstate != 1:
                     print(f"{uri}: Landing failed, retry started")
-                    commander.go_to(0.0,0.0,0.1,0.0,self.t_goto)
+                    commander.go_to(0.0,0.0,0.15,0.0,self.t_goto)
                     time.sleep(self.t_goto+1)
-                    commander.go_to(0.0,0.0,0.03,0.0,self.t_goto)
+                    commander.go_to(0.0,0.0,0.06,0.0,self.t_goto)
+                    time.sleep(self.t_goto+2)
+                    commander.land(0.03,self.t_land)
                     time.sleep(self.t_goto)
-                    commander.land(0.0,self.t_land)
                     time.sleep(self.t_wait)
                     for i in range(5):
                         self.get_charging_status()
@@ -166,5 +168,5 @@ class SwarmCharge(Swarm):
                 commander.stop()
                 self.close_links()
         else:
-            print("Err: drone in the air!")
+            # print("Err: drone in the air!")
             return
