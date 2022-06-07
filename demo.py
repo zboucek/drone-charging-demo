@@ -30,9 +30,9 @@ generic and each Crazyflie has its own sequence of setpoints that it files
 to.
 
 """
-from calendar import c
-import time
-from collections import namedtuple
+# from calendar import c
+# import time
+# from collections import namedtuple
 
 import cflib.crtp
 # from cflib.crazyflie.log import LogConfig
@@ -44,17 +44,25 @@ from swarm_charge import SwarmCharge
 HEIGHT = 0.5 # z-global [meters]
 
 # Change uris and sequences according to your setup
-# URI1 = 'radio://0/100/2M/E7E7E7E701'
+URI1 = 'radio://0/100/2M/E7E7E7E701'
 URI2 = 'radio://0/100/2M/E7E7E7E702'
-# URI3 = 'radio://0/100/2M/E7E7E7E703'
+URI3 = 'radio://0/100/2M/E7E7E7E703'
 URI4 = 'radio://0/100/2M/E7E7E7E704'
 
 # List of URIs, comment the one you do not want to fly
 uris = {
     # URI1,
     URI2,
-    # URI3,
+    URI3,
     URI4
+}
+
+# List of URIs, comment the one you do not want to fly
+uris2 = {
+    # URI1,
+    URI2,
+    # URI3,
+    # URI4
 }
 
 if __name__ == '__main__':
@@ -62,6 +70,6 @@ if __name__ == '__main__':
     cflib.crtp.init_drivers()
 
     factory = CachedCfFactory(rw_cache='./cache')
-    with SwarmCharge(uris, factory=factory) as swarm:
-        while True:
+    with SwarmCharge(uris2, factory=factory) as swarm:
+        # while True:
             swarm.demo_mission()
