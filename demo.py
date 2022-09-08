@@ -59,8 +59,8 @@ uris = {
 
 # List of URIs, comment the one you do not want to fly
 uris2 = {
-    # URI1,
-    URI2,
+    URI1,
+    # URI2,
     # URI3,
     # URI4
 }
