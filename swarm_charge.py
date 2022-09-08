@@ -43,7 +43,6 @@ class SwarmCharge(Swarm):
         
         self.get_charging_status()
         for uri, cf in self._cfs.items():
-                # return uri, cf
             if (self._states[uri].pmstate == 2 or self._states[uri].pmstate == 2) and self._states[uri].lhstatus == 2:
                 return uri, cf
         
@@ -67,45 +66,45 @@ class SwarmCharge(Swarm):
     
     def __wait_for_position_estimator(self, scf):
         log_config = LogConfig(name='Kalman Variance', period_in_ms=500)
-        log_config.add_variable('kalman.varPX', 'float')
-        log_config.add_variable('kalman.varPY', 'float')
-        log_config.add_variable('kalman.varPZ', 'float')
+        # log_config.add_variable('kalman.varPX', 'float')
+        # log_config.add_variable('kalman.varPY', 'float')
+        # log_config.add_variable('kalman.varPZ', 'float')
         log_config.add_variable('stateEstimate.x', 'float')
         log_config.add_variable('stateEstimate.y', 'float')
+        N = 5
+        x_history = [0] * N
+        y_history = [0] * N
+        # var_y_history = [N] * 10
+        # var_x_history = [N] * 10
+        # var_z_history = [N] * 10
 
-        x_history = [1000] * 10
-        y_history = [1000] * 10
-        var_y_history = [1000] * 10
-        var_x_history = [1000] * 10
-        var_z_history = [1000] * 10
-
-        threshold = 0.000001
+        threshold = 0.01
 
         with SyncLogger(scf, log_config) as logger:
-            for log_entry in logger:
+            for i, log_entry in enumerate(logger):
                 data = log_entry[1]
 
                 x_history.append(data['stateEstimate.x'])
                 x_history.pop(0)
                 y_history.append(data['stateEstimate.y'])
                 y_history.pop(0)
-                var_x_history.append(data['kalman.varPX'])
-                var_x_history.pop(0)
-                var_y_history.append(data['kalman.varPY'])
-                var_y_history.pop(0)
-                var_z_history.append(data['kalman.varPZ'])
-                var_z_history.pop(0)
+                # var_x_history.append(data['kalman.varPX'])
+                # var_x_history.pop(0)
+                # var_y_history.append(data['kalman.varPY'])
+                # var_y_history.pop(0)
+                # var_z_history.append(data['kalman.varPZ'])
+                # var_z_history.pop(0)
 
-                min_x = min(var_x_history)
-                max_x = max(var_x_history)
-                min_y = min(var_y_history)
-                max_y = max(var_y_history)
-                min_z = min(var_z_history)
-                max_z = max(var_z_history)
-
-                if (max_x - min_x) < threshold and (
-                        max_y - min_y) < threshold and (
-                        max_z - min_z) < threshold:
+                # min_x = min(var_x_history)
+                # max_x = max(var_x_history)
+                # min_y = min(var_y_history)
+                # max_y = max(var_y_history)
+                # min_z = min(var_z_history)
+                # max_z = max(var_z_history)
+                # if (max_x - min_x) < threshold and (
+                #         max_y - min_y) < threshold and (
+                #         max_z - min_z) < threshold and i>N:
+                if  i>len(x_history):
                     x = mean(x_history)
                     y = mean(y_history)
                     return x,y

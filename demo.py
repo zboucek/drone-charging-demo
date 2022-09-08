@@ -60,9 +60,9 @@ uris = {
 # List of URIs, comment the one you do not want to fly
 uris2 = {
     URI1,
-    # URI2,
+    URI2,
     # URI3,
-    # URI4
+    URI4
 }
 
 if __name__ == '__main__':
@@ -71,5 +71,5 @@ if __name__ == '__main__':
 
     factory = CachedCfFactory(rw_cache='./cache')
     with SwarmCharge(uris2, factory=factory) as swarm:
-        # while True:
+        while True:
             swarm.demo_mission()
