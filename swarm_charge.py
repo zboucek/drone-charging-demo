@@ -1,4 +1,5 @@
 from cflib.crazyflie.swarm import *
+from numpy import mean
 
 SwarmState = namedtuple('SwarmState', 'pmstate lhstatus isflying canfly crashed')
 
@@ -69,7 +70,11 @@ class SwarmCharge(Swarm):
         log_config.add_variable('kalman.varPX', 'float')
         log_config.add_variable('kalman.varPY', 'float')
         log_config.add_variable('kalman.varPZ', 'float')
+        log_config.add_variable('stateEstimate.x', 'float')
+        log_config.add_variable('stateEstimate.y', 'float')
 
+        x_history = [1000] * 10
+        y_history = [1000] * 10
         var_y_history = [1000] * 10
         var_x_history = [1000] * 10
         var_z_history = [1000] * 10
@@ -80,6 +85,10 @@ class SwarmCharge(Swarm):
             for log_entry in logger:
                 data = log_entry[1]
 
+                x_history.append(data['stateEstimate.x'])
+                x_history.pop(0)
+                y_history.append(data['stateEstimate.y'])
+                y_history.pop(0)
                 var_x_history.append(data['kalman.varPX'])
                 var_x_history.pop(0)
                 var_y_history.append(data['kalman.varPY'])
@@ -97,7 +106,10 @@ class SwarmCharge(Swarm):
                 if (max_x - min_x) < threshold and (
                         max_y - min_y) < threshold and (
                         max_z - min_z) < threshold:
-                    break
+                    x = mean(x_history)
+                    y = mean(y_history)
+                    return x,y
+                    # break
 
     def __reset_estimator(self, scf):
         cf = scf.cf
@@ -116,7 +128,8 @@ class SwarmCharge(Swarm):
                 time.sleep(1)
             
             print(f"{uri}: preflight check")
-            self.__set_initial_position(cf)
+            x, y = self.__wait_for_position_estimator(cf)
+            self.__set_initial_position(cf, x = x, y= y)
             # self.__reset_estimator(cf)
             cf.cf.param.set_value('commander.enHighLevel', '1')
             self.cf_in_air = True
@@ -125,11 +138,11 @@ class SwarmCharge(Swarm):
                 commander.takeoff(self.height,self.t_takeoff)
                 print(f"{uri}: Take off")
                 time.sleep(self.t_takeoff+1)
-                commander.go_to(0.0,0.0,self.height,0.0,self.t_goto)
+                commander.go_to(x,y,self.height,0.0,self.t_goto)
                 print(f"{uri}: Go to setpoint")
                 time.sleep(self.t_goto+1)
                 print(f"{uri}: Prepare for landing")
-                commander.go_to(0.0,0.0,0.06,0.0,self.t_goto)
+                commander.go_to(x,y,0.06,0.0,self.t_goto)
                 time.sleep(self.t_goto+2)
                 commander.land(0.03,self.t_land)
                 print(f"{uri}: Landing...")
@@ -145,9 +158,9 @@ class SwarmCharge(Swarm):
                         break
                 while self._states[uri].pmstate != 1:
                     print(f"{uri}: Landing failed, retry started")
-                    commander.go_to(0.0,0.0,0.15,0.0,self.t_goto)
+                    commander.go_to(x,y,0.15,0.0,self.t_goto)
                     time.sleep(self.t_goto+1)
-                    commander.go_to(0.0,0.0,0.06,0.0,self.t_goto)
+                    commander.go_to(x,y,0.06,0.0,self.t_goto)
                     time.sleep(self.t_goto+2)
                     commander.land(0.03,self.t_land)
                     time.sleep(self.t_goto)
