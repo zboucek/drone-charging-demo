@@ -2,12 +2,15 @@ from cflib.crazyflie.swarm import *
 from numpy import mean
 import time
 import datetime
+import playsound
+from gtts import gTTS 
+import os
 
 SwarmState = namedtuple('SwarmState', 'pmstate lhstatus isflying canfly crashed')
 
 class SwarmCharge(Swarm):
     
-    def __init__(self, uris, height = 0.5, factory=None):
+    def __init__(self, uris, height = 0.5, factory=None, lang = 'en'):
         super().__init__(uris, factory)
         self.height = height
         self.cf_in_air = False
@@ -16,6 +19,7 @@ class SwarmCharge(Swarm):
         self.t_land = 0.5
         self.t_goto = 5.0
         self.t_wait = 1.0
+        self.lang = lang
         
     def __get_charging_status(self, scf):
         log_config = LogConfig(name='state', period_in_ms=10)
@@ -122,15 +126,24 @@ class SwarmCharge(Swarm):
     
     def __tnow(self):
         return datetime.datetime.now().strftime("%H:%M:%S")
+
+    
+    def speak(self, text):
+        tts = gTTS(text=text, lang=self.lang, slow=False)
+
+        filename = "abc.mp3"
+        tts.save(filename)
+        playsound.playsound(filename)
+        os.remove(filename)
     
     def demo_mission(self):
         if not self.__in_air():
             uri = None
+            self.speak("Waiting for charged drone.")
             print(f"[{self.__tnow()}] Waiting for charged drone...")
             while uri is None:
                 uri, cf = self.__get_charged_drone()
                 time.sleep(1)
-            
             print(f"[{self.__tnow()}] {uri}: preflight check")
             x, y = self.__wait_for_position_estimator(cf)
             self.__set_initial_position(cf, x = x, y= y)
@@ -140,7 +153,10 @@ class SwarmCharge(Swarm):
             try:
                 commander = cf.cf.high_level_commander
                 commander.takeoff(self.height,self.t_takeoff)
-                print(f"[{self.__tnow()}] {uri}: Take off")
+                cmd_text = "Take off"
+                print(f"[{self.__tnow()}] {uri}: {cmd_text}")
+                self.speak(cmd_text)
+
                 time.sleep(self.t_takeoff+1)
                 commander.go_to(x,y,self.height,0.0,self.t_goto)
                 print(f"[{self.__tnow()}] {uri}: Go to setpoint")
