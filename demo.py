@@ -30,15 +30,10 @@ generic and each Crazyflie has its own sequence of setpoints that it files
 to.
 
 """
-# from calendar import c
-# import time
-# from collections import namedtuple
 
 import cflib.crtp
-# from cflib.crazyflie.log import LogConfig
 from cflib.crazyflie.swarm import CachedCfFactory
 from swarm_charge import SwarmCharge
-# from cflib.crazyflie.syncLogger import SyncLogger
 
 # Parameters
 HEIGHT = 0.5 # z-global [meters]
@@ -51,9 +46,9 @@ URI4 = 'radio://0/100/2M/E7E7E7E704'
 
 # List of URIs, comment the one you do not want to fly
 uris = {
-    # URI1,
+    URI1,
     URI2,
-    URI3,
+    # URI3,
     URI4
 }
 
@@ -66,10 +61,10 @@ uris2 = {
 }
 
 if __name__ == '__main__':
-    # logging.basicConfig(level=logging.DEBUG)
     cflib.crtp.init_drivers()
 
     factory = CachedCfFactory(rw_cache='./cache')
-    with SwarmCharge(uris2, factory=factory) as swarm:
+    with SwarmCharge(uris, factory=factory) as swarm:
         while True:
             swarm.demo_mission()
+            # time.sleep(5)

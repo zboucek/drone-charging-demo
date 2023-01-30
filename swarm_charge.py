@@ -1,5 +1,7 @@
 from cflib.crazyflie.swarm import *
 from numpy import mean
+import time
+import datetime
 
 SwarmState = namedtuple('SwarmState', 'pmstate lhstatus isflying canfly crashed')
 
@@ -43,6 +45,7 @@ class SwarmCharge(Swarm):
         
         self.get_charging_status()
         for uri, cf in self._cfs.items():
+            # return uri, cf
             if (self._states[uri].pmstate == 2 or self._states[uri].pmstate == 2) and self._states[uri].lhstatus == 2:
                 return uri, cf
         
@@ -117,16 +120,18 @@ class SwarmCharge(Swarm):
         cf.param.set_value('kalman.resetEstimation', '0')
         self.__wait_for_position_estimator(scf)
     
+    def __tnow(self):
+        return datetime.datetime.now().strftime("%H:%M:%S")
     
     def demo_mission(self):
         if not self.__in_air():
             uri = None
-            print("Waiting for charged drone...")
+            print(f"[{self.__tnow()}] Waiting for charged drone...")
             while uri is None:
                 uri, cf = self.__get_charged_drone()
                 time.sleep(1)
             
-            print(f"{uri}: preflight check")
+            print(f"[{self.__tnow()}] {uri}: preflight check")
             x, y = self.__wait_for_position_estimator(cf)
             self.__set_initial_position(cf, x = x, y= y)
             # self.__reset_estimator(cf)
@@ -135,16 +140,16 @@ class SwarmCharge(Swarm):
             try:
                 commander = cf.cf.high_level_commander
                 commander.takeoff(self.height,self.t_takeoff)
-                print(f"{uri}: Take off")
+                print(f"[{self.__tnow()}] {uri}: Take off")
                 time.sleep(self.t_takeoff+1)
                 commander.go_to(x,y,self.height,0.0,self.t_goto)
-                print(f"{uri}: Go to setpoint")
+                print(f"[{self.__tnow()}] {uri}: Go to setpoint")
                 time.sleep(self.t_goto+1)
-                print(f"{uri}: Prepare for landing")
+                print(f"[{self.__tnow()}] {uri}: Prepare for landing")
                 commander.go_to(x,y,0.06,0.0,self.t_goto)
                 time.sleep(self.t_goto+2)
                 commander.land(0.03,self.t_land)
-                print(f"{uri}: Landing...")
+                print(f"[{self.__tnow()}] {uri}: Landing...")
                 time.sleep(self.t_goto+2)
                 time.sleep(self.t_land+1)
                 for i in range(5):
@@ -153,10 +158,10 @@ class SwarmCharge(Swarm):
                     if self._states[uri].pmstate == 1:
                         break
                     elif self._states[uri].pmstate == 3:
-                        print(f"{uri}: Low battery, abort mission")
+                        print(f"[{self.__tnow()}] {uri}: Low battery, abort mission!")
                         break
                 while self._states[uri].pmstate != 1:
-                    print(f"{uri}: Landing failed, retry started")
+                    print(f"[{self.__tnow()}] {uri}: Landing failed, retry started")
                     commander.go_to(x,y,0.15,0.0,self.t_goto)
                     time.sleep(self.t_goto+1)
                     commander.go_to(x,y,0.06,0.0,self.t_goto)
@@ -170,15 +175,15 @@ class SwarmCharge(Swarm):
                         if self._states[uri].pmstate == 1:
                             break
                         elif self._states[uri].pmstate == 3:
-                            print(f"{uri}: Low battery, abort mission")
+                            print(f"[{self.__tnow()}] {uri}: Low battery, abort mission")
                             break
                 
-                print(f"{uri}: Landing successful")
+                print(f"[{self.__tnow()}] {uri}: Landing successful")
                 commander.stop()
                 self.cf_in_air = False
             except Exception as e:
                 commander.stop()
                 self.close_links()
         else:
-            # print("Err: drone in the air!")
+            # print(f"[{self.__tnow()}] Err: drone in the air!")
             return
