@@ -10,7 +10,7 @@ SwarmState = namedtuple('SwarmState', 'pmstate lhstatus isflying canfly crashed'
 
 class SwarmCharge(Swarm):
     
-    def __init__(self, uris, height = 0.5, factory=None, lang = 'en'):
+    def __init__(self, uris, height = 0.5, factory=None, lang = 'en', sound = True):
         super().__init__(uris, factory)
         self.height = height
         self.cf_in_air = False
@@ -20,6 +20,7 @@ class SwarmCharge(Swarm):
         self.t_goto = 5.0
         self.t_wait = 1.0
         self.lang = lang
+        self.sound = sound
         
     def __get_charging_status(self, scf):
         log_config = LogConfig(name='state', period_in_ms=10)
@@ -135,16 +136,25 @@ class SwarmCharge(Swarm):
         tts.save(filename)
         playsound.playsound(filename)
         os.remove(filename)
+
+    def msg(self, uri, text):
+        if uri is None:
+            uri = ""
+            drone_number = ""
+        else:
+            drone_number = "Drone "+uri[-1]
+        print(f"[{self.__tnow()}] {uri}: {text}")
+        if self.sound:
+            self.speak(drone_number+" " +text)
     
     def demo_mission(self):
         if not self.__in_air():
             uri = None
-            self.speak("Waiting for charged drone.")
-            print(f"[{self.__tnow()}] Waiting for charged drone...")
+            self.msg(uri, "Waiting for charged drone...")
             while uri is None:
                 uri, cf = self.__get_charged_drone()
                 time.sleep(1)
-            print(f"[{self.__tnow()}] {uri}: preflight check")
+            self.msg(uri, "Preflight check")
             x, y = self.__wait_for_position_estimator(cf)
             self.__set_initial_position(cf, x = x, y= y)
             # self.__reset_estimator(cf)
@@ -153,19 +163,17 @@ class SwarmCharge(Swarm):
             try:
                 commander = cf.cf.high_level_commander
                 commander.takeoff(self.height,self.t_takeoff)
-                cmd_text = "Take off"
-                print(f"[{self.__tnow()}] {uri}: {cmd_text}")
-                self.speak(cmd_text)
+                self.msg(uri, "Take off")
 
                 time.sleep(self.t_takeoff+1)
                 commander.go_to(x,y,self.height,0.0,self.t_goto)
-                print(f"[{self.__tnow()}] {uri}: Go to setpoint")
+                self.msg(uri, "Go to setpoint")
                 time.sleep(self.t_goto+1)
-                print(f"[{self.__tnow()}] {uri}: Prepare for landing")
+                self.msg(uri, "Prepare for landing")
                 commander.go_to(x,y,0.06,0.0,self.t_goto)
                 time.sleep(self.t_goto+2)
                 commander.land(0.03,self.t_land)
-                print(f"[{self.__tnow()}] {uri}: Landing...")
+                self.msg(uri, "Landing...")
                 time.sleep(self.t_goto+2)
                 time.sleep(self.t_land+1)
                 for i in range(5):
@@ -174,10 +182,10 @@ class SwarmCharge(Swarm):
                     if self._states[uri].pmstate == 1:
                         break
                     elif self._states[uri].pmstate == 3:
-                        print(f"[{self.__tnow()}] {uri}: Low battery, abort mission!")
+                        self.msg(uri, "Low battery, abort mission!")
                         break
                 while self._states[uri].pmstate != 1:
-                    print(f"[{self.__tnow()}] {uri}: Landing failed, retry started")
+                    self.msg(uri, "Landing failed, repeat landing")
                     commander.go_to(x,y,0.15,0.0,self.t_goto)
                     time.sleep(self.t_goto+1)
                     commander.go_to(x,y,0.06,0.0,self.t_goto)
@@ -191,10 +199,10 @@ class SwarmCharge(Swarm):
                         if self._states[uri].pmstate == 1:
                             break
                         elif self._states[uri].pmstate == 3:
-                            print(f"[{self.__tnow()}] {uri}: Low battery, abort mission")
+                            self.msg(uri, "Low battery, abort mission!")
                             break
                 
-                print(f"[{self.__tnow()}] {uri}: Landing successful")
+                self.msg(uri, "Landing succesfull!")
                 commander.stop()
                 self.cf_in_air = False
             except Exception as e:
