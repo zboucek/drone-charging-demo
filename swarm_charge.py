@@ -202,7 +202,7 @@ class SwarmCharge(Swarm):
                             self.msg(uri, "Low battery, abort mission!")
                             break
                 
-                self.msg(uri, "Landing succesfull!")
+                self.msg(uri, "Landing successful!")
                 commander.stop()
                 self.cf_in_air = False
             except Exception as e:
