@@ -52,14 +52,6 @@ uris = {
     URI4
 }
 
-# List of URIs, comment the one you do not want to fly
-uris2 = {
-    URI1,
-    URI2,
-    # URI3,
-    URI4
-}
-
 if __name__ == '__main__':
     cflib.crtp.init_drivers()
 
