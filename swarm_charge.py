@@ -6,7 +6,7 @@ import playsound
 from gtts import gTTS 
 import os
 
-SwarmState = namedtuple('SwarmState', 'pmstate lhstatus isflying canfly crashed')
+SwarmState = namedtuple('SwarmState', 'pmstate pmlevel lhstatus isflying canfly crashed')
 
 class SwarmCharge(Swarm):
     
@@ -58,20 +58,24 @@ class SwarmCharge(Swarm):
         
         return None, None
     
-    def get_battery_level(self):
-        self.parallel_safe(self.__get_drone_battery_level)
-        return self._states
-    
     def __get_drone_battery_level(self):
         """Sequentially search for charged and flyable drone according to battery level."""
         
         self.get_charging_status()
+        uri_temp=None
+        cf_temp = None
+        pmlevel_temp = 0
         for uri, cf in self._cfs.items():
-            # return uri, cf
-            if (self._states[uri].pmlevel > 0.8) and self._states[uri].lhstatus == 2 and not self._states[uri].crashed:
-                return uri, cf, self._states[uri].pmlevel
-        
-        return None, None, None
+            # return uri, cf, battery level in perc.
+            if (self._states[uri].pmlevel >= 80) and self._states[uri].lhstatus == 2 and not self._states[uri].crashed:
+                if self._states[uri].pmlevel >= pmlevel_temp:
+                    pmlevel_temp = self._states[uri].pmlevel
+                    uri_temp = uri
+                    cf_temp = cf
+        if uri_temp is not None:
+            return uri_temp, cf_temp, pmlevel_temp
+        else:
+            return None, None, None
     
     def __set_initial_position(self, scf, x=0.0, y=0.0, z=0.0, yaw_radians=0.0):
         scf.cf.param.set_value('kalman.initialX', x)
@@ -144,7 +148,7 @@ class SwarmCharge(Swarm):
             uri = None
             self.msg(uri, "Waiting for charged drone...")
             while uri is None:
-                uri, cf = self.__get_charged_drone()
+                uri, cf, battery = self.__get_drone_battery_level()
                 time.sleep(1)
             self.msg(uri, "Preflight check")
             x, y = self.__wait_for_position_estimator(cf)
@@ -155,17 +159,17 @@ class SwarmCharge(Swarm):
             try:
                 commander = cf.cf.high_level_commander
                 commander.takeoff(self.height,self.t_takeoff)
-                self.msg(uri, "Take off")
+                self.msg(uri, "is taking off")
 
                 time.sleep(self.t_takeoff+1)
-                commander.go_to(x,y,self.height,0.0,self.t_goto)
-                self.msg(uri, "Go to setpoint")
+                commander.go_to(x,y,self.height+0.5,0.0,self.t_goto)
+                self.msg(uri, "goes to setpoint")
                 time.sleep(self.t_goto+1)
-                self.msg(uri, "Prepare for landing")
+                self.msg(uri, "is prepare for landing")
                 commander.go_to(x,y,0.06,0.0,self.t_goto)
                 time.sleep(self.t_goto+2)
                 commander.land(0.03,self.t_land)
-                self.msg(uri, "Landing...")
+                self.msg(uri, "is landing...")
                 time.sleep(self.t_goto+2)
                 time.sleep(self.t_land+1)
                 for i in range(5):
@@ -174,10 +178,10 @@ class SwarmCharge(Swarm):
                     if self._states[uri].pmstate == 1:
                         break
                     elif self._states[uri].pmstate == 3:
-                        self.msg(uri, "Low battery, abort mission!")
+                        self.msg(uri, "has low battery, abort mission!")
                         break
                 while self._states[uri].pmstate != 1:
-                    self.msg(uri, "Landing failed, repeat landing")
+                    self.msg(uri, "failed landing, repeat landing")
                     commander.go_to(x,y,0.15,0.0,self.t_goto)
                     time.sleep(self.t_goto+1)
                     commander.go_to(x,y,0.06,0.0,self.t_goto)
@@ -191,7 +195,10 @@ class SwarmCharge(Swarm):
                         if self._states[uri].pmstate == 1:
                             break
                         elif self._states[uri].pmstate == 3:
-                            self.msg(uri, "Low battery, abort mission!")
+                            self.msg(uri, "has low battery, abort mission!")
+                            break
+                        elif self._states[uri].crashed:
+                            self.msg(uri, "crashed!")
                             break
                 
                 self.msg(uri, "Landing successful!")
