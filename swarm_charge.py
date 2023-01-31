@@ -1,5 +1,5 @@
 from cflib.crazyflie.swarm import *
-from numpy import mean
+import numpy as np
 import time
 import datetime
 import playsound
@@ -72,6 +72,18 @@ class SwarmCharge(Swarm):
         
         return False
     
+    def get_polynomial_traj(self, waypoints):
+        # # Define waypoints as an array
+        # waypoints = np.array([[x1, y1, t1], [x2, y2, t2], [x3, y3, t3], ...])
+
+        # Calculate polynomial coefficients
+        coefficients = np.polyfit(waypoints[:,0], waypoints[:,1], deg=3)
+
+        # Calculate trajectory time-based
+        trajectory = np.polyval(coefficients, waypoints[:,0]-waypoints[:,2])
+        
+        return trajectory
+    
     def __wait_for_position_estimator(self, scf):
         log_config = LogConfig(name='Kalman Variance', period_in_ms=500)
         # log_config.add_variable('kalman.varPX', 'float')
@@ -113,8 +125,8 @@ class SwarmCharge(Swarm):
                 #         max_y - min_y) < threshold and (
                 #         max_z - min_z) < threshold and i>N:
                 if  i>len(x_history):
-                    x = mean(x_history)
-                    y = mean(y_history)
+                    x = np.mean(x_history)
+                    y = np.mean(y_history)
                     return x,y
                     # break
 
