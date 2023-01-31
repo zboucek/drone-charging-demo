@@ -3,6 +3,7 @@ from cflib.crazyflie.swarm import *
 # for traj
 from cflib.crazyflie.mem import MemoryElement
 from cflib.crazyflie.mem import Poly4D
+from gen_traj import ReferenceTrajectory
 # others
 import numpy as np
 import time
@@ -41,6 +42,9 @@ square = [[2, 0.0, 0.0, 0.0, 0.0, 1.09375, -1.3125, 0.546875, -0.078125, 0.0, 0.
   [2, 0.5, 4.9, -10.5, -2.914335439641036e-15, -4.637499999999997, 13.229999999999997, -7.454999999999997, 1.2512499999999995, 0.0, 1.4, 0.0, 7.28583859910259e-16, -26.29374999999999, 35.14874999999998, -15.789374999999993, 2.376249999999999, 1.0, 0.0, 0.0, 7.28583859910259e-16, 3.642919299551295e-16, 1.3660947373317356e-16, -1.7076184216646695e-17, 2.134523027080837e-18, 0.0, 0.0, 0.0, 0.0, 4.375, -5.25, 2.1875, -0.3125, ],  # noqa
   [2, 0.5, 2.1000000000000005, -11.76, 2.914335439641036e-15, 25.681250000000002, -25.59375, 9.603125, -1.2825, 0.5, 4.9, -11.76, 4.371503159461554e-15, 0.08749999999998744, 7.875000000000011, -5.250000000000004, 0.9362500000000006, 1.0, 0.0, 0.0, 7.28583859910259e-16, 3.642919299551295e-16, 1.3660947373317356e-16, -1.7076184216646695e-17, 2.134523027080837e-18, 2.0, 0.0, 0.0, 1.457167719820518e-15, -8.749999999999998, 10.5, -4.375, 0.625, ],  # noqa
   [2, 0.0, -1.4, 0.0, -7.28583859910259e-16, 3.5000000000000004, -3.9375000000000013, 1.5750000000000006, -0.21875000000000006, 0.5, 2.1000000000000005, -10.500000000000002, 2.914335439641036e-15, 19.906250000000004, -19.031250000000004, 6.934375000000001, -0.9062500000000002, 1.0, 0.0, 0.0, 7.28583859910259e-16, 3.642919299551295e-16, 1.3660947373317356e-16, -1.7076184216646695e-17, 2.134523027080837e-18, -2.0, 0.0, 0.0, -1.457167719820518e-15, 4.374999999999999, -5.25, 2.1875, -0.3125, ], ]  # noqa
+
+ts = 0.01
+ref = ReferenceTrajectory("figure8", ts = ts, N=50000, space=[0.5,0.75,1.0], tscale=1.2)
 
 def run_sequence(cf, trajectory_id, duration):
     commander = cf.high_level_commander
@@ -237,21 +241,29 @@ class SwarmCharge(Swarm):
             # self.__reset_estimator(cf)
             cf.cf.param.set_value('commander.enHighLevel', '1')
             self.cf_in_air = True
-            trajectory_id = 1
-            duration = self.upload_trajectory(cf.cf, trajectory_id, square)
-            print('The sequence is {:.1f} seconds long'.format(duration))    
+            duration = 10.0
+            # trajectory_id = 1
+            # duration = self.upload_trajectory(cf.cf, trajectory_id, square)
+            # print('The sequence is {:.1f} seconds long'.format(duration))    
             try:
                 commander = cf.cf.high_level_commander
                 commander.takeoff(self.height,self.t_takeoff)
                 self.msg(uri, "Take off")
 
                 time.sleep(self.t_takeoff+1)
-                commander.go_to(x,y,self.height,0.0,self.t_goto)
-                self.msg(uri, "Go to setpoint")
-                time.sleep(self.t_goto+1)
-                relative = True
-                commander.start_trajectory(trajectory_id, 1.0, relative)
-                time.sleep(duration)
+                # commander.go_to(x,y,self.height+1,0.0,self.t_goto)
+                # self.msg(uri, "Go to setpoint")
+                # time.sleep(self.t_goto+1)
+                self.msg(uri,"flies.")
+                # relative = True
+                t_start = time.time()
+                while t_start+duration >= time.time():
+                    t_now = time.time()
+                    k = int((t_now-t_start)//ts)
+                    print(ref.x[k])
+                    commander.go_to(ref.x[k], ref.y[k], ref.z[k], 0.0, ts)
+                    time.sleep(ts)
+                # time.sleep(duration)
                 self.msg(uri, "Prepare for landing")
                 commander.go_to(x,y,0.06,0.0,self.t_goto)
                 time.sleep(self.t_goto+2)
@@ -289,6 +301,7 @@ class SwarmCharge(Swarm):
                 commander.stop()
                 self.cf_in_air = False
             except Exception as e:
+                print(e)
                 commander.stop()
                 self.close_links()
         else:
