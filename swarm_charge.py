@@ -25,6 +25,7 @@ class SwarmCharge(Swarm):
     def __get_charging_status(self, scf):
         log_config = LogConfig(name='state', period_in_ms=10)
         log_config.add_variable('pm.state', 'uint8_t')
+        log_config.add_variable('pm.batteryLevel', 'uint8_t')
         log_config.add_variable('lighthouse.status', 'uint8_t')
         log_config.add_variable('sys.isFlying', 'uint8_t')
         log_config.add_variable('sys.canfly', 'uint8_t')
@@ -33,11 +34,12 @@ class SwarmCharge(Swarm):
         with SyncLogger(scf, log_config) as logger:
             for entry in logger:
                 pmstate = entry[1]['pm.state']
+                pmlevel = entry[1]['pm.batteryLevel']
                 lhstatus = entry[1]['lighthouse.status']
                 isflying = entry[1]['sys.isFlying']
                 canfly = entry[1]['sys.canfly']
                 crashed = entry[1]['sys.isTumbled']
-                self._states[scf.cf.link_uri] = SwarmState(pmstate, lhstatus, isflying, canfly, crashed)
+                self._states[scf.cf.link_uri] = SwarmState(pmstate, pmlevel, lhstatus, isflying, canfly, crashed)
                 break
     
     
@@ -51,10 +53,25 @@ class SwarmCharge(Swarm):
         self.get_charging_status()
         for uri, cf in self._cfs.items():
             # return uri, cf
-            if (self._states[uri].pmstate == 2 or self._states[uri].pmstate == 2) and self._states[uri].lhstatus == 2:
+            if (self._states[uri].pmstate == 2 or self._states[uri].pmstate == 2) and self._states[uri].lhstatus == 2 and not self._states[uri].crashed:
                 return uri, cf
         
         return None, None
+    
+    def get_battery_level(self):
+        self.parallel_safe(self.__get_drone_battery_level)
+        return self._states
+    
+    def __get_drone_battery_level(self):
+        """Sequentially search for charged and flyable drone according to battery level."""
+        
+        self.get_charging_status()
+        for uri, cf in self._cfs.items():
+            # return uri, cf
+            if (self._states[uri].pmlevel > 0.8) and self._states[uri].lhstatus == 2 and not self._states[uri].crashed:
+                return uri, cf, self._states[uri].pmlevel
+        
+        return None, None, None
     
     def __set_initial_position(self, scf, x=0.0, y=0.0, z=0.0, yaw_radians=0.0):
         scf.cf.param.set_value('kalman.initialX', x)
@@ -74,19 +91,11 @@ class SwarmCharge(Swarm):
     
     def __wait_for_position_estimator(self, scf):
         log_config = LogConfig(name='Kalman Variance', period_in_ms=500)
-        # log_config.add_variable('kalman.varPX', 'float')
-        # log_config.add_variable('kalman.varPY', 'float')
-        # log_config.add_variable('kalman.varPZ', 'float')
         log_config.add_variable('stateEstimate.x', 'float')
         log_config.add_variable('stateEstimate.y', 'float')
         N = 5
         x_history = [0] * N
         y_history = [0] * N
-        # var_y_history = [N] * 10
-        # var_x_history = [N] * 10
-        # var_z_history = [N] * 10
-
-        threshold = 0.01
 
         with SyncLogger(scf, log_config) as logger:
             for i, log_entry in enumerate(logger):
@@ -96,27 +105,10 @@ class SwarmCharge(Swarm):
                 x_history.pop(0)
                 y_history.append(data['stateEstimate.y'])
                 y_history.pop(0)
-                # var_x_history.append(data['kalman.varPX'])
-                # var_x_history.pop(0)
-                # var_y_history.append(data['kalman.varPY'])
-                # var_y_history.pop(0)
-                # var_z_history.append(data['kalman.varPZ'])
-                # var_z_history.pop(0)
-
-                # min_x = min(var_x_history)
-                # max_x = max(var_x_history)
-                # min_y = min(var_y_history)
-                # max_y = max(var_y_history)
-                # min_z = min(var_z_history)
-                # max_z = max(var_z_history)
-                # if (max_x - min_x) < threshold and (
-                #         max_y - min_y) < threshold and (
-                #         max_z - min_z) < threshold and i>N:
                 if  i>len(x_history):
                     x = mean(x_history)
                     y = mean(y_history)
                     return x,y
-                    # break
 
     def __reset_estimator(self, scf):
         cf = scf.cf
