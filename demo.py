@@ -47,8 +47,8 @@ URI4 = 'radio://0/100/2M/E7E7E7E704'
 # List of URIs, comment the one you do not want to fly
 uris = {
     URI1,
-    URI2,
-    # URI3,
+    # URI2,
+    URI3,
     URI4
 }
 
@@ -56,7 +56,7 @@ if __name__ == '__main__':
     cflib.crtp.init_drivers()
 
     factory = CachedCfFactory(rw_cache='./cache')
-    with SwarmCharge(uris, factory=factory) as swarm:
+    with SwarmCharge(uris, factory=factory, lang = 'cs', sound = True) as swarm:
         while True:
             swarm.demo_mission()
             # time.sleep(5)

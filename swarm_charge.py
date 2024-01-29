@@ -12,7 +12,7 @@ import datetime
 import os
 # speech
 import playsound
-from gtts import gTTS 
+from gtts import gTTS
 import os
 
 SwarmState = namedtuple('SwarmState', 'pmstate pmlevel lhstatus isflying canfly crashed')
@@ -221,7 +221,10 @@ class SwarmCharge(Swarm):
             uri = ""
             drone_number = ""
         else:
-            drone_number = "Drone "+uri[-1]
+            if self.lang == 'en':
+                drone_number = "Drone "+uri[-1]
+            else:
+                drone_number = "Dron "+uri[-1]
         print(f"[{self.__tnow()}] {uri}: {text}")
         if self.sound:
             self.speak(drone_number+" " +text)
@@ -229,11 +232,17 @@ class SwarmCharge(Swarm):
     def demo_mission(self):
         if not self.__in_air():
             uri = None
-            self.msg(uri, "Waiting for charged drone...")
+            if self.lang == 'en':
+                self.msg(uri, "Waiting for charged drone...")
+            else:
+                self.msg(uri, "Čeká se na nabitý dron...")
             while uri is None:
                 uri, cf, battery = self.__get_drone_battery_level()
                 time.sleep(1)
-            self.msg(uri, "Preflight check")
+            if self.lang == 'en':
+                self.msg(uri, "Preflight check")
+            else:
+                self.msg(uri, "provádí předletovou kontrolu")
             x, y = self.__wait_for_position_estimator(cf)
             self.__set_initial_position(cf, x = x, y= y)
             # self.__reset_estimator(cf)
@@ -246,8 +255,10 @@ class SwarmCharge(Swarm):
             try:
                 commander = cf.cf.high_level_commander
                 commander.takeoff(self.height,self.t_takeoff)
-                self.msg(uri, "is taking off")
-
+                if self.lang == 'en':
+                    self.msg(uri, "is taking off")
+                else:
+                    self.msg(uri, "vzlétá")
                 time.sleep(self.t_takeoff+1)
                 # commander.go_to(x,y,self.height+1,0.0,self.t_goto)
                 # self.msg(uri, "Go to setpoint")
@@ -264,11 +275,17 @@ class SwarmCharge(Swarm):
                 # time.sleep(duration)
                 commander.go_to(x,y,self.height+0.5,0.0,self.t_goto)
                 time.sleep(self.t_goto)
-                self.msg(uri, "Prepare for landing")
+                if self.lang == 'en':
+                    self.msg(uri, "Prepare for landing")
+                else:
+                    self.msg(uri, "se připravuje na přistání")
                 commander.go_to(x,y,0.06,0.0,self.t_goto)
                 time.sleep(self.t_goto+2)
                 commander.land(0.03,self.t_land)
-                self.msg(uri, "is landing...")
+                if self.lang == 'en':
+                    self.msg(uri, "is landing...")
+                else:
+                    self.msg(uri, "přistává...")
                 time.sleep(self.t_goto+2)
                 time.sleep(self.t_land+1)
                 for i in range(5):
@@ -277,10 +294,16 @@ class SwarmCharge(Swarm):
                     if self._states[uri].pmstate == 1:
                         break
                     elif self._states[uri].pmstate == 3:
-                        self.msg(uri, "has low battery, abort mission!")
+                        if self.lang == 'en':
+                            self.msg(uri, "has low battery, abort mission!")
+                        else:
+                            self.msg(uri, "má vybitou baterii, mise je přerušena!")
                         break
                 while self._states[uri].pmstate != 1:
-                    self.msg(uri, "failed landing, repeat landing")
+                    if self.lang == 'en':
+                        self.msg(uri, "failed landing, repeat landing")
+                    else:
+                        self.msg(uri, "přistál neúspěšně, nový pokus o přistání")
                     commander.go_to(x,y,0.15,0.0,self.t_goto)
                     time.sleep(self.t_goto+1)
                     commander.go_to(x,y,0.06,0.0,self.t_goto)
@@ -294,13 +317,22 @@ class SwarmCharge(Swarm):
                         if self._states[uri].pmstate == 1:
                             break
                         elif self._states[uri].pmstate == 3:
-                            self.msg(uri, "has low battery, abort mission!")
+                            if self.lang == 'en':
+                                self.msg(uri, "has low battery, abort mission!")
+                            else:
+                                self.msg(uri, "má vybitou baterii, mise je přerušena!")
                             break
                         elif self._states[uri].crashed:
-                            self.msg(uri, "crashed!")
+                            if self.lang == 'en':
+                                self.msg(uri, "crashed!")
+                            else:
+                                self.msg(uri, "havaroval!")
                             break
                 
-                self.msg(uri, "Landing successful!")
+                if self.lang == 'en':
+                    self.msg(uri, "has landed successfully!")
+                else:
+                    self.msg(uri, "úspěšně přistál!")
                 commander.stop()
                 self.cf_in_air = False
             except Exception as e:
