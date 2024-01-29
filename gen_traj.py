@@ -10,6 +10,7 @@ class ReferenceTrajectory(object):
             N (int, optional): number of samples. Defaults to 50000.
             space (float, optional): size of flight space in m. Defaults to 2.
         """
+        self.ts = ts
         self.t = np.cumsum(ts*np.ones(N))
         self.tscale = tscale
         if hasattr(space, "__len__"):
@@ -38,6 +39,7 @@ class ReferenceTrajectory(object):
         self.x = self.space[0]*np.cos(self.tscale[0]*self.t)
         self.y = self.space[1]*np.sin(self.tscale[1]*self.t)
         self.z = self.space[2]*np.ones(len(self.t))
+        self.z[:int(20/self.ts)] = self.space[2]*np.linspace(self.tscale[2],self.tscale[2]+0.75,int(20/self.ts))
         
     def get_polynomial_traj(self):
         # # Define waypoints as an array

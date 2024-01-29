@@ -46,7 +46,7 @@ SwarmState = namedtuple('SwarmState', 'pmstate pmlevel lhstatus isflying canfly 
 # class MyEmptyObject:
 #     pass
 ts = 0.5
-# ref = ReferenceTrajectory("spiral", ts = ts, N=50000, space=[0.3,0.3,1.0], tscale=1.2)
+ref = ReferenceTrajectory("spiral", ts = ts, N=50000, space=[0.3,0.3,0.7], tscale=1.2)
 # trajectory = MyEmptyObject()
 # trajectory.t = ref.t.copy()
 # trajectory.x = np.polyfit(ref.t, ref.x, 7)
@@ -54,7 +54,7 @@ ts = 0.5
 # trajectory.z = np.polyfit(ref.t, ref.z, 7)
 # trajectory.yaw = np.polyfit(ref.t, 0.0*ref.t, 7)
 
-ref = ReferenceTrajectory("figure8", ts = ts, N=50000, space=[0.3,0.2,0.7], tscale=1.5)
+# ref = ReferenceTrajectory("figure8", ts = ts, N=50000, space=[0.3,0.2,0.7], tscale=1.5)
 
 def run_sequence(cf, trajectory_id, duration):
     commander = cf.high_level_commander
