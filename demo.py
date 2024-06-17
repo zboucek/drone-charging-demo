@@ -56,7 +56,7 @@ if __name__ == '__main__':
     cflib.crtp.init_drivers()
 
     factory = CachedCfFactory(rw_cache='./cache')
-    with SwarmCharge(uris, factory=factory, lang = 'cs', sound = True) as swarm:
+    with SwarmCharge(uris, factory=factory, lang = 'cs', sound = True, center = [0.0, 0.0, 0.0]) as swarm:
         while True:
             swarm.demo_mission()
             # time.sleep(5)

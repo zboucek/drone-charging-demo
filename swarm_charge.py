@@ -15,7 +15,8 @@ import playsound
 from gtts import gTTS
 import os
 
-SwarmState = namedtuple('SwarmState', 'pmstate pmlevel lhstatus isflying canfly crashed')
+SwarmState = namedtuple('SwarmState', 'pmstate pmlevel isflying canfly crashed')
+# SwarmState = namedtuple('SwarmState', 'pmstate pmlevel lhstatus isflying canfly crashed')
 
 # figure8 = [
     # [1.050000, 0.000000, -0.000000, 0.000000, -0.000000, 0.830443, -0.276140, -0.384219, 0.180493, -0.000000, 0.000000, -0.000000, 0.000000, -1.356107, 0.688430, 0.587426, -0.329106, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
@@ -47,6 +48,7 @@ SwarmState = namedtuple('SwarmState', 'pmstate pmlevel lhstatus isflying canfly 
 #     pass
 ts = 0.5
 ref = ReferenceTrajectory("spiral", ts = ts, N=50000, space=[0.3,0.3,0.7], tscale=1.2)
+
 # trajectory = MyEmptyObject()
 # trajectory.t = ref.t.copy()
 # trajectory.x = np.polyfit(ref.t, ref.x, 7)
@@ -80,7 +82,7 @@ def run_sequence(cf, trajectory_id, duration):
 
 class SwarmCharge(Swarm):
     
-    def __init__(self, uris, height = 0.5, factory=None, lang = 'en', sound = True):
+    def __init__(self, uris, height = 0.5, factory=None, lang = 'en', sound = True, center = [0.0,0.0,0.0]):
         super().__init__(uris, factory)
         self.height = height
         self.cf_in_air = False
@@ -92,11 +94,16 @@ class SwarmCharge(Swarm):
         self.lang = lang
         self.sound = sound
         
+        if len(center) == 3:
+            self.center = center
+        else:
+            raise ValueError('center should be a list of 3 floats')
+        
     def __get_charging_status(self, scf):
         log_config = LogConfig(name='state', period_in_ms=10)
         log_config.add_variable('pm.state', 'uint8_t')
         log_config.add_variable('pm.batteryLevel', 'uint8_t')
-        log_config.add_variable('lighthouse.status', 'uint8_t')
+        # log_config.add_variable('lighthouse.status', 'uint8_t')
         log_config.add_variable('sys.isFlying', 'uint8_t')
         log_config.add_variable('sys.canfly', 'uint8_t')
         log_config.add_variable('sys.isTumbled', 'uint8_t')
@@ -105,11 +112,12 @@ class SwarmCharge(Swarm):
             for entry in logger:
                 pmstate = entry[1]['pm.state']
                 pmlevel = entry[1]['pm.batteryLevel']
-                lhstatus = entry[1]['lighthouse.status']
+                # lhstatus = entry[1]['lighthouse.status']
                 isflying = entry[1]['sys.isFlying']
                 canfly = entry[1]['sys.canfly']
                 crashed = entry[1]['sys.isTumbled']
-                self._states[scf.cf.link_uri] = SwarmState(pmstate, pmlevel, lhstatus, isflying, canfly, crashed)
+                # self._states[scf.cf.link_uri] = SwarmState(pmstate, pmlevel, lhstatus, isflying, canfly, crashed)
+                self._states[scf.cf.link_uri] = SwarmState(pmstate, pmlevel, isflying, canfly, crashed)
                 break
     
     
@@ -123,7 +131,9 @@ class SwarmCharge(Swarm):
         self.get_charging_status()
         for uri, cf in self._cfs.items():
             # return uri, cf
-            if (self._states[uri].pmstate == 2 or self._states[uri].pmstate == 2) and self._states[uri].lhstatus == 2 and not self._states[uri].crashed:
+            # if (self._states[uri].pmstate == 2 or self._states[uri].pmstate == 2) and self._states[uri].lhstatus == 2 and not self._states[uri].crashed:
+
+            if (self._states[uri].pmstate == 2 or self._states[uri].pmstate == 2) and not self._states[uri].crashed:
                 return uri, cf
         
         return None, None
@@ -137,7 +147,8 @@ class SwarmCharge(Swarm):
         pmlevel_temp = 0
         for uri, cf in self._cfs.items():
             # return uri, cf, battery level in perc.
-            if (self._states[uri].pmlevel >= 80) and self._states[uri].lhstatus == 2 and not self._states[uri].crashed:
+            # if (self._states[uri].pmlevel >= 80) and self._states[uri].lhstatus == 2 and not self._states[uri].crashed:
+            if (self._states[uri].pmlevel >= 80) and not self._states[uri].crashed:
                 if self._states[uri].pmlevel >= pmlevel_temp:
                     pmlevel_temp = self._states[uri].pmlevel
                     uri_temp = uri
@@ -241,6 +252,10 @@ class SwarmCharge(Swarm):
             self.speak(drone_number+" " +text)
     
     def demo_mission(self):
+        
+        ref.x = ref.x + self.center[0]
+        ref.y = ref.y + self.center[1]
+        ref.z = ref.z + self.center[2]
         if not self.__in_air():
             uri = None
             if self.lang == 'en':
