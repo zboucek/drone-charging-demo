@@ -99,6 +99,9 @@ class SwarmCharge(Swarm):
         else:
             raise ValueError('center should be a list of 3 floats')
         
+        ref.x = ref.x + self.center[0]
+        ref.y = ref.y + self.center[1]
+        ref.z = ref.z + self.center[2]
     def __get_charging_status(self, scf):
         log_config = LogConfig(name='state', period_in_ms=10)
         log_config.add_variable('pm.state', 'uint8_t')
@@ -148,11 +151,13 @@ class SwarmCharge(Swarm):
         for uri, cf in self._cfs.items():
             # return uri, cf, battery level in perc.
             # if (self._states[uri].pmlevel >= 80) and self._states[uri].lhstatus == 2 and not self._states[uri].crashed:
+            # print(self._states[uri].pmlevel)
             if (self._states[uri].pmlevel >= 80) and not self._states[uri].crashed:
                 if self._states[uri].pmlevel >= pmlevel_temp:
                     pmlevel_temp = self._states[uri].pmlevel
                     uri_temp = uri
                     cf_temp = cf
+                    print(f"[{self.__tnow()}] {uri}: {self._states[uri].pmlevel}%")
         if uri_temp is not None:
             return uri_temp, cf_temp, pmlevel_temp
         else:
@@ -252,10 +257,6 @@ class SwarmCharge(Swarm):
             self.speak(drone_number+" " +text)
     
     def demo_mission(self):
-        
-        ref.x = ref.x + self.center[0]
-        ref.y = ref.y + self.center[1]
-        ref.z = ref.z + self.center[2]
         if not self.__in_air():
             uri = None
             if self.lang == 'en':
