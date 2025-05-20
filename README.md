@@ -87,6 +87,12 @@ with SwarmCharge(uris) as swarm:
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
+## Acknowledgements
+
+This project includes code adapted from the Crazyflie Python library, specifically the example `autonomous_sequence_high_level.py` from the [crazyflie-lib-python](https://github.com/bitcraze/crazyflie-lib-python) repository. The original code is licensed under the GNU General Public License v2 or later.
+
+For more details, see the [LICENSE](LICENSE) file.
+
 ## Repository
 
 This project is publicly mirrored on GitHub under the name [drone-charging-demo](https://github.com/yourusername/drone-charging-demo).
