@@ -15,8 +15,8 @@ import playsound
 from gtts import gTTS
 import os
 
-SwarmState = namedtuple('SwarmState', 'pmstate pmlevel isflying canfly crashed')
-# SwarmState = namedtuple('SwarmState', 'pmstate pmlevel lhstatus isflying canfly crashed')
+# SwarmState = namedtuple('SwarmState', 'pmstate pmlevel isflying canfly crashed')
+SwarmState = namedtuple('SwarmState', 'pmstate pmlevel lhstatus isflying canfly crashed')
 
 # figure8 = [
     # [1.050000, 0.000000, -0.000000, 0.000000, -0.000000, 0.830443, -0.276140, -0.384219, 0.180493, -0.000000, 0.000000, -0.000000, 0.000000, -1.356107, 0.688430, 0.587426, -0.329106, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
@@ -47,7 +47,7 @@ SwarmState = namedtuple('SwarmState', 'pmstate pmlevel isflying canfly crashed')
 # class MyEmptyObject:
 #     pass
 ts = 0.5
-ref = ReferenceTrajectory("spiral", ts = ts, N=50000, space=[0.3,0.3,0.7], tscale=1.2)
+# ref = ReferenceTrajectory("spiral", ts = ts, N=50000, space=[0.3,0.3,0.7], tscale=1.2)
 
 # trajectory = MyEmptyObject()
 # trajectory.t = ref.t.copy()
@@ -56,7 +56,7 @@ ref = ReferenceTrajectory("spiral", ts = ts, N=50000, space=[0.3,0.3,0.7], tscal
 # trajectory.z = np.polyfit(ref.t, ref.z, 7)
 # trajectory.yaw = np.polyfit(ref.t, 0.0*ref.t, 7)
 
-# ref = ReferenceTrajectory("figure8", ts = ts, N=50000, space=[0.3,0.2,0.7], tscale=1.5)
+ref = ReferenceTrajectory("figure8", ts = ts, N=50000, space=[0.5,0.3,0.7], tscale=1.5)
 
 def run_sequence(cf, trajectory_id, duration):
     commander = cf.high_level_commander
@@ -106,7 +106,7 @@ class SwarmCharge(Swarm):
         log_config = LogConfig(name='state', period_in_ms=10)
         log_config.add_variable('pm.state', 'uint8_t')
         log_config.add_variable('pm.batteryLevel', 'uint8_t')
-        # log_config.add_variable('lighthouse.status', 'uint8_t')
+        log_config.add_variable('lighthouse.status', 'uint8_t')
         log_config.add_variable('sys.isFlying', 'uint8_t')
         log_config.add_variable('sys.canfly', 'uint8_t')
         log_config.add_variable('sys.isTumbled', 'uint8_t')
@@ -115,12 +115,12 @@ class SwarmCharge(Swarm):
             for entry in logger:
                 pmstate = entry[1]['pm.state']
                 pmlevel = entry[1]['pm.batteryLevel']
-                # lhstatus = entry[1]['lighthouse.status']
+                lhstatus = entry[1]['lighthouse.status']
                 isflying = entry[1]['sys.isFlying']
                 canfly = entry[1]['sys.canfly']
                 crashed = entry[1]['sys.isTumbled']
-                # self._states[scf.cf.link_uri] = SwarmState(pmstate, pmlevel, lhstatus, isflying, canfly, crashed)
-                self._states[scf.cf.link_uri] = SwarmState(pmstate, pmlevel, isflying, canfly, crashed)
+                self._states[scf.cf.link_uri] = SwarmState(pmstate, pmlevel, lhstatus, isflying, canfly, crashed)
+                # self._states[scf.cf.link_uri] = SwarmState(pmstate, pmlevel, isflying, canfly, crashed)
                 break
     
     
@@ -134,9 +134,9 @@ class SwarmCharge(Swarm):
         self.get_charging_status()
         for uri, cf in self._cfs.items():
             # return uri, cf
-            # if (self._states[uri].pmstate == 2 or self._states[uri].pmstate == 2) and self._states[uri].lhstatus == 2 and not self._states[uri].crashed:
+            if (self._states[uri].pmstate == 2 or self._states[uri].pmstate == 2) and self._states[uri].lhstatus == 2 and not self._states[uri].crashed:
 
-            if (self._states[uri].pmstate == 2 or self._states[uri].pmstate == 2) and not self._states[uri].crashed:
+            # if (self._states[uri].pmstate == 2 or self._states[uri].pmstate == 2) and not self._states[uri].crashed:
                 return uri, cf
         
         return None, None
@@ -150,9 +150,9 @@ class SwarmCharge(Swarm):
         pmlevel_temp = 0
         for uri, cf in self._cfs.items():
             # return uri, cf, battery level in perc.
-            # if (self._states[uri].pmlevel >= 80) and self._states[uri].lhstatus == 2 and not self._states[uri].crashed:
+            if (self._states[uri].pmlevel >= 80) and self._states[uri].lhstatus == 2 and not self._states[uri].crashed:
             # print(self._states[uri].pmlevel)
-            if (self._states[uri].pmlevel >= 80) and not self._states[uri].crashed:
+            # if (self._states[uri].pmlevel >= 80) and not self._states[uri].crashed:
                 if self._states[uri].pmlevel >= pmlevel_temp:
                     pmlevel_temp = self._states[uri].pmlevel
                     uri_temp = uri
@@ -275,7 +275,7 @@ class SwarmCharge(Swarm):
             # self.__reset_estimator(cf)
             cf.cf.param.set_value('commander.enHighLevel', '1')
             self.cf_in_air = True
-            duration = 20.0
+            duration = 15.0
             # trajectory_id = 1
             # duration = self.upload_trajectory(cf.cf, trajectory_id, trajectory)
             # print('The sequence is {:.1f} seconds long'.format(duration))    
