@@ -1,4 +1,4 @@
-# dronfest22_simple
+# drone-charging-demo
 
 This repository contains scripts and utilities for controlling Crazyflie drones, including reading and writing Lighthouse base station memory, generating trajectories, and managing a swarm of drones.
 
@@ -85,7 +85,7 @@ with SwarmCharge(uris) as swarm:
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0. You are free to use, modify, and distribute this software, provided that any modifications or derivative works are also licensed under the same terms. For more details, see the [LICENSE](LICENSE) file.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## Repository
 
